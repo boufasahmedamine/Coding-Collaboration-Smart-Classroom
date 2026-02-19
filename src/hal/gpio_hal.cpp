@@ -7,12 +7,16 @@ public:
     void configure(uint8_t pin, Direction dir) override
     {
         pinMode(pin, dir == Direction::Out ? OUTPUT : INPUT);
-
     }
 
     void write(uint8_t pin, bool level) override
     {
         digitalWrite(pin, level ? HIGH : LOW);
+    }
+
+    bool read(uint8_t pin) override
+    {
+        return digitalRead(pin) == HIGH;
     }
 };
 
