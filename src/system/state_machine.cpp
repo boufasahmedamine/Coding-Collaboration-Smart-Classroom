@@ -13,19 +13,71 @@ StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs)
 
 void StateMachine::init() {
     _doorLock.init();
-    _currentState = State::LOCKED;
+    transitionTo(State::LOCKED);
 }
 
-void StateMachine::requestSessionStart() {
-    if (_currentState == State::LOCKED) {
-        _doorLock.unlock();
-        _sessionStartTime = millis();
-        _currentState = State::SESSION_UNLOCKED;
+void StateMachine::transitionTo(State newState) {
+    if (_currentState == newState) {
+        return;
+    }
+
+    // Exit logic (none for now)
+
+    // Transition
+    _currentState = newState;
+
+    // Entry logic
+    switch (_currentState) {
+
+        case State::SESSION_ACTIVE:
+            _doorLock.unlock();
+            _sessionStartTime = millis();
+            break;
+
+        case State::LOCKED:
+            // Locking remains handled externally (preserve behavior)
+            break;
+
+        default:
+            break;
+    }
+}
+
+void StateMachine::handleEvent(SystemEvent event) {
+    switch (event) {
+
+        case SystemEvent::ACCESS_GRANTED:
+            if (_currentState == State::LOCKED) {
+                transitionTo(State::SESSION_ACTIVE);
+            }
+            break;
+
+        case SystemEvent::OVERRIDE_ON:
+            _overrideActive = true;
+            if (_currentState == State::LOCKED) {
+                transitionTo(State::SESSION_ACTIVE);
+            }
+            break;
+
+        case SystemEvent::OVERRIDE_OFF:
+            _overrideActive = false;
+            break;
+
+        case SystemEvent::PRESENCE_DETECTED:
+            _presenceDetected = true;
+            break;
+
+        case SystemEvent::PRESENCE_LOST:
+            _presenceDetected = false;
+            break;
+
+        default:
+            break;
     }
 }
 
 void StateMachine::update() {
-    if (_currentState == State::SESSION_UNLOCKED) {
+    if (_currentState == State::SESSION_ACTIVE) {
 
         // Safety override always keeps it unlocked
         if (_overrideActive) {
@@ -39,7 +91,7 @@ void StateMachine::update() {
             // Future: only lock if no presence
             if (!_presenceDetected) {
                 _doorLock.lock();
-                _currentState = State::LOCKED;
+                transitionTo(State::LOCKED);
             }
         }
     }
@@ -58,7 +110,6 @@ void StateMachine::setOverrideActive(bool active) {
 
     // Immediate unlock if override activated
     if (_overrideActive && _currentState == State::LOCKED) {
-        _doorLock.unlock();
-        _currentState = State::SESSION_UNLOCKED;
+        transitionTo(State::SESSION_ACTIVE);
     }
 }

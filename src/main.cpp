@@ -28,7 +28,7 @@ if (Serial.available()) {
 
     if (c == 'u') {
         Serial.println("[EVENT] Session Start Requested");
-        stateMachine.requestSessionStart();
+        stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
     }
 }
     // ---- Heartbeat ----

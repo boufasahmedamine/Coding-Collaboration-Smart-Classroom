@@ -22,7 +22,7 @@ void runStateMachineTest() {
 
         if (c == 'u') {
             Serial.println("Unlock session requested");
-            stateMachine.requestSessionStart();
+            stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
         }
     }
 

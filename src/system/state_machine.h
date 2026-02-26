@@ -5,18 +5,27 @@
 
 class StateMachine {
 public:
-    enum class State {
-        LOCKED,
-        SESSION_UNLOCKED
-    };
+    enum class SystemEvent {
+    ACCESS_GRANTED,
+    SESSION_TIMEOUT,
+    PRESENCE_DETECTED,
+    PRESENCE_LOST,
+    OVERRIDE_ON,
+    OVERRIDE_OFF
+};
+enum class State {
+    LOCKED,
+    ACCESS_OPEN,
+    SESSION_ACTIVE
+};
 
     StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs);
 
     void init();
     void update();
 
-    // Called when first authorized RFID is detected
-    void requestSessionStart();
+    // Event handling interface for future expansion
+    void handleEvent(SystemEvent event);
 
     State getState() const;
 
@@ -34,6 +43,8 @@ private:
 
     bool _presenceDetected;
     bool _overrideActive;
+
+    void transitionTo(State newState);
 };
 
 #endif
