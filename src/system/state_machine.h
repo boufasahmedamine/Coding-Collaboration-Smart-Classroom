@@ -7,7 +7,6 @@ class StateMachine {
 public:
     enum class SystemEvent {
     ACCESS_GRANTED,
-    SESSION_TIMEOUT,
     PRESENCE_DETECTED,
     PRESENCE_LOST,
     OVERRIDE_ON,
@@ -15,7 +14,6 @@ public:
 };
 enum class State {
     LOCKED,
-    ACCESS_OPEN,
     SESSION_ACTIVE
 };
 
@@ -45,6 +43,9 @@ private:
     bool _overrideActive;
 
     void transitionTo(State newState);
+
+    void handleLockedState(SystemEvent event);
+    void handleSessionActiveState(SystemEvent event);
 };
 
 #endif

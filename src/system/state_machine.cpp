@@ -7,7 +7,6 @@
 static const char* stateToString(StateMachine::State state) {
     switch (state) {
         case StateMachine::State::LOCKED: return "LOCKED";
-        case StateMachine::State::ACCESS_OPEN: return "ACCESS_OPEN";
         case StateMachine::State::SESSION_ACTIVE: return "SESSION_ACTIVE";
         default: return "UNKNOWN";
     }
@@ -63,19 +62,58 @@ void StateMachine::transitionTo(State newState) {
 }
 
 void StateMachine::handleEvent(SystemEvent event) {
+
+    switch (_currentState) {
+
+        case State::LOCKED:
+            handleLockedState(event);
+            break;
+
+        case State::SESSION_ACTIVE:
+            handleSessionActiveState(event);
+            break;
+
+        default:
+            break;
+    }
+}
+
+void StateMachine::handleLockedState(SystemEvent event) {
+
     switch (event) {
 
         case SystemEvent::ACCESS_GRANTED:
-            if (_currentState == State::LOCKED) {
-                transitionTo(State::SESSION_ACTIVE);
-            }
+            transitionTo(State::SESSION_ACTIVE);
             break;
 
         case SystemEvent::OVERRIDE_ON:
             _overrideActive = true;
-            if (_currentState == State::LOCKED) {
-                transitionTo(State::SESSION_ACTIVE);
-            }
+            transitionTo(State::SESSION_ACTIVE);
+            break;
+
+        case SystemEvent::OVERRIDE_OFF:
+            _overrideActive = false;
+            break;
+
+        case SystemEvent::PRESENCE_DETECTED:
+            _presenceDetected = true;
+            break;
+
+        case SystemEvent::PRESENCE_LOST:
+            _presenceDetected = false;
+            break;
+
+        default:
+            break;
+    }
+}
+
+void StateMachine::handleSessionActiveState(SystemEvent event) {
+
+    switch (event) {
+
+        case SystemEvent::OVERRIDE_ON:
+            _overrideActive = true;
             break;
 
         case SystemEvent::OVERRIDE_OFF:
