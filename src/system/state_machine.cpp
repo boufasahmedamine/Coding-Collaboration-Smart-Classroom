@@ -1,6 +1,19 @@
 #include "system/state_machine.h"
 #include <Arduino.h>
 
+//#define DEBUG_STATE_MACHINE
+
+#ifdef DEBUG_STATE_MACHINE
+static const char* stateToString(StateMachine::State state) {
+    switch (state) {
+        case StateMachine::State::LOCKED: return "LOCKED";
+        case StateMachine::State::ACCESS_OPEN: return "ACCESS_OPEN";
+        case StateMachine::State::SESSION_ACTIVE: return "SESSION_ACTIVE";
+        default: return "UNKNOWN";
+    }
+}
+#endif
+
 StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs)
     : _doorLock(doorLock),
       _currentState(State::LOCKED),
@@ -21,12 +34,19 @@ void StateMachine::transitionTo(State newState) {
         return;
     }
 
-    // Exit logic (none for now)
+#ifdef DEBUG_STATE_MACHINE
+    State oldState = _currentState;
+#endif
 
-    // Transition
     _currentState = newState;
 
-    // Entry logic
+#ifdef DEBUG_STATE_MACHINE
+    Serial.print("[SM] ");
+    Serial.print(stateToString(oldState));
+    Serial.print(" -> ");
+    Serial.println(stateToString(_currentState));
+#endif
+
     switch (_currentState) {
 
         case State::SESSION_ACTIVE:
@@ -35,7 +55,6 @@ void StateMachine::transitionTo(State newState) {
             break;
 
         case State::LOCKED:
-            // Locking remains handled externally (preserve behavior)
             break;
 
         default:
