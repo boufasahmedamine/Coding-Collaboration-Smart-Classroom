@@ -2,6 +2,7 @@
 #define STATE_MACHINE_H
 
 #include "drivers/actuators/door_lock.h"
+#include "system/session_record.h"
 
 class StateMachine {
 public:
@@ -41,6 +42,8 @@ private:
 
     bool _presenceDetected;
     bool _overrideActive;
+
+    SessionRecord _session;
 
     void transitionTo(State newState);
 

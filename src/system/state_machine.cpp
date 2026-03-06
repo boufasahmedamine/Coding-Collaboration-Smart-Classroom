@@ -21,10 +21,18 @@ StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs)
       _presenceDetected(false),
       _overrideActive(false)
 {
+    _session.active = false;
+    _session.uidLength = 0;
+    _session.startTime = 0;
+    _session.endTime = 0;
+    for (int i = 0; i < 7; i++) {
+        _session.uid[i] = 0;
+    }
 }
 
 void StateMachine::init() {
     _doorLock.init();
+    _session.active = false;
     transitionTo(State::LOCKED);
 }
 
@@ -83,11 +91,15 @@ void StateMachine::handleLockedState(SystemEvent event) {
     switch (event) {
 
         case SystemEvent::ACCESS_GRANTED:
+            _session.startTime = millis();
+            _session.active = true;
             transitionTo(State::SESSION_ACTIVE);
             break;
 
         case SystemEvent::OVERRIDE_ON:
             _overrideActive = true;
+            _session.startTime = millis();
+            _session.active = true;
             transitionTo(State::SESSION_ACTIVE);
             break;
 
@@ -165,6 +177,8 @@ void StateMachine::update() {
 
             // Future: only lock if no presence
             if (!_presenceDetected) {
+                _session.endTime = millis();
+                _session.active = false;
                 _doorLock.lock();
                 transitionTo(State::LOCKED);
             }

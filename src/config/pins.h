@@ -4,4 +4,7 @@
 #define PIN_DOOR_LOCK  25  // example GPIO
 #define DOOR_ACTIVE_HIGH true
 
+#define PN532_SDA 21
+#define PN532_SCL 22
+
 #endif
