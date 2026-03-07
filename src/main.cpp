@@ -2,11 +2,13 @@
 #include "config/pins.h"
 #include "drivers/actuators/door_lock.h"
 #include "drivers/rfid/pn532.h"
+#include "services/auth/access_control.h"
 #include "system/state_machine.h"
 
 DoorLock doorLock(PIN_DOOR_LOCK, true);
 StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
 PN532Driver rfid;
+AccessControl accessControl;
 
 unsigned long lastHeartbeat = 0;
 const unsigned long HEARTBEAT_INTERVAL = 10000;  // every 10 seconds
@@ -43,7 +45,7 @@ void loop() {
         }
     }
 
-    // ---- RFID Card Detection ----
+    // ---- RFID Card Detection & Authorization ----
     uint8_t uid[7];
     uint8_t uidLength;
 
@@ -54,6 +56,13 @@ void loop() {
             Serial.print(" ");
         }
         Serial.println();
+
+        if (accessControl.isAuthorized(uid, uidLength)) {
+            Serial.println("[AUTH] ACCESS GRANTED");
+            stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+        } else {
+            Serial.println("[AUTH] ACCESS DENIED");
+        }
     }
 
     // ---- Heartbeat ----
