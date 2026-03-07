@@ -11,8 +11,11 @@ public:
 
     bool readCard(uint8_t* uidBuffer, uint8_t* uidLength);
 
+    void simulateCardDetected();
+
 private:
     bool _initialized;
+    bool _simulateCard;
 };
 
 #endif

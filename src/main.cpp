@@ -30,6 +30,19 @@ void setup() {
 void loop() {
     stateMachine.update();
 
+    // ---- Serial Input Handler ----
+    if (Serial.available()) {
+        char c = Serial.read();
+
+        if (c == 'c') {
+            // Trigger RFID simulation
+            rfid.simulateCardDetected();
+        } else if (c == 'u') {
+            Serial.println("[EVENT] Session Start Requested");
+            stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+        }
+    }
+
     // ---- RFID Card Detection ----
     uint8_t uid[7];
     uint8_t uidLength;
@@ -42,16 +55,7 @@ void loop() {
         }
         Serial.println();
     }
-    
-// ---- Serial Test Trigger ----
-if (Serial.available()) {
-    char c = Serial.read();
 
-    if (c == 'u') {
-        Serial.println("[EVENT] Session Start Requested");
-        stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
-    }
-}
     // ---- Heartbeat ----
     if (millis() - lastHeartbeat >= HEARTBEAT_INTERVAL) {
         Serial.print("[ALIVE] ");
