@@ -3,6 +3,7 @@
 
 #include "drivers/actuators/door_lock.h"
 #include "system/session_record.h"
+#include "services/attendance/attendance_manager.h"
 
 class StateMachine {
 public:
@@ -18,7 +19,7 @@ enum class State {
     SESSION_ACTIVE
 };
 
-    StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs);
+    StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs, AttendanceManager* attendanceManager = nullptr);
 
     void init();
     void update();
@@ -34,6 +35,7 @@ enum class State {
 
 private:
     DoorLock& _doorLock;
+    AttendanceManager* _attendanceManager;
 
     State _currentState;
 

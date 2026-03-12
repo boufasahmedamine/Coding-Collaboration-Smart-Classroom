@@ -3,10 +3,12 @@
 #include "drivers/actuators/door_lock.h"
 #include "drivers/rfid/pn532.h"
 #include "services/auth/access_control.h"
+#include "services/attendance/attendance_manager.h"
 #include "system/state_machine.h"
 
 DoorLock doorLock(PIN_DOOR_LOCK, true);
-StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
+AttendanceManager attendanceManager;
+StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
 PN532Driver rfid;
 AccessControl accessControl;
 

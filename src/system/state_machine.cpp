@@ -13,13 +13,14 @@ static const char* stateToString(StateMachine::State state) {
 }
 #endif
 
-StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs)
+StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs, AttendanceManager* attendanceManager)
     : _doorLock(doorLock),
       _currentState(State::LOCKED),
       _sessionStartTime(0),
       _sessionDurationMs(sessionDurationMs),
       _presenceDetected(false),
-      _overrideActive(false)
+      _overrideActive(false),
+      _attendanceManager(attendanceManager)
 {
     _session.active = false;
     _session.uidLength = 0;
@@ -100,6 +101,10 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
                                     _session.uid[i] = uid[i];
                                   }
                              }
+
+               if (_attendanceManager) {
+                   _attendanceManager->onSessionStart(_session);
+               }
 
                transitionTo(State::SESSION_ACTIVE);
             break;
@@ -187,6 +192,11 @@ void StateMachine::update() {
             if (!_presenceDetected) {
                 _session.endTime = millis();
                 _session.active = false;
+
+                if (_attendanceManager) {
+                    _attendanceManager->onSessionEnd(_session);
+                }
+
                 _doorLock.lock();
                 transitionTo(State::LOCKED);
             }
