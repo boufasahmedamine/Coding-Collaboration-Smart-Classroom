@@ -5,6 +5,7 @@
 #include "services/auth/access_control.h"
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
+#include "communication/wifi_manager.h"
 #include "system/state_machine.h"
 
 DoorLock doorLock(PIN_DOOR_LOCK, true);
@@ -13,6 +14,7 @@ AttendanceManager attendanceManager(&logManager);
 StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
 PN532Driver rfid;
 AccessControl accessControl;
+WiFiManager wifiManager("SSID", "PASSWORD");
 
 unsigned long lastHeartbeat = 0;
 const unsigned long HEARTBEAT_INTERVAL = 10000;  // every 10 seconds
@@ -29,11 +31,13 @@ void setup() {
     }
 
     stateMachine.init();
+    wifiManager.begin();
 
     Serial.println("[INFO] Type 'u' to request unlock");
 }
 
 void loop() {
+    wifiManager.update();
     stateMachine.update();
 
     // ---- Serial Input Handler ----
