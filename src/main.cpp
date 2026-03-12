@@ -12,11 +12,11 @@
 DoorLock doorLock(PIN_DOOR_LOCK, true);
 LogManager logManager;
 AttendanceManager attendanceManager(&logManager);
-StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
-PN532Driver rfid;
-AccessControl accessControl;
 WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
+LogManager logManager(&mqttManager);
+AttendanceManager attendanceManager(&logManager);
+StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
 
 unsigned long lastHeartbeat = 0;
 const unsigned long HEARTBEAT_INTERVAL = 10000;  // every 10 seconds

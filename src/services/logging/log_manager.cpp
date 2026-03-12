@@ -1,7 +1,10 @@
 #include "services/logging/log_manager.h"
 #include <Arduino.h>
 
-LogManager::LogManager() {}
+LogManager::LogManager(MQTTManager* mqtt)
+    : _mqtt(mqtt)
+{
+}
 
 void LogManager::logSessionStart(const SessionRecord& session)
 {
@@ -14,6 +17,11 @@ void LogManager::logSessionStart(const SessionRecord& session)
     }
 
     Serial.println();
+
+    if (_mqtt && _mqtt->isConnected())
+    {
+        _mqtt->publish("zarzara/session/start", "session_started");
+    }
 }
 
 void LogManager::logSessionEnd(const SessionRecord& session)
@@ -24,4 +32,9 @@ void LogManager::logSessionEnd(const SessionRecord& session)
 
     Serial.print(duration / 1000);
     Serial.println(" seconds");
+
+    if (_mqtt && _mqtt->isConnected())
+    {
+        _mqtt->publish("zarzara/session/end", "session_ended");
+    }
 }
