@@ -69,12 +69,12 @@ void StateMachine::transitionTo(State newState) {
     }
 }
 
-void StateMachine::handleEvent(SystemEvent event) {
+void StateMachine::handleEvent(SystemEvent event, const uint8_t* uid, uint8_t uidLength) {
 
     switch (_currentState) {
 
         case State::LOCKED:
-            handleLockedState(event);
+            handleLockedState(event, uid, uidLength);
             break;
 
         case State::SESSION_ACTIVE:
@@ -86,14 +86,22 @@ void StateMachine::handleEvent(SystemEvent event) {
     }
 }
 
-void StateMachine::handleLockedState(SystemEvent event) {
+void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint8_t uidLength) {
 
     switch (event) {
 
         case SystemEvent::ACCESS_GRANTED:
-            _session.startTime = millis();
-            _session.active = true;
-            transitionTo(State::SESSION_ACTIVE);
+                                    _session.startTime = millis();
+                                    _session.active = true;
+                                   if (uid != nullptr && uidLength > 0) {
+                                   _session.uidLength = uidLength;
+
+                                   for (int i = 0; i < uidLength && i < 7; i++) {
+                                    _session.uid[i] = uid[i];
+                                  }
+                             }
+
+               transitionTo(State::SESSION_ACTIVE);
             break;
 
         case SystemEvent::OVERRIDE_ON:

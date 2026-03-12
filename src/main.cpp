@@ -59,7 +59,7 @@ void loop() {
 
         if (accessControl.isAuthorized(uid, uidLength)) {
             Serial.println("[AUTH] ACCESS GRANTED");
-            stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+            stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED, uid, uidLength);
         } else {
             Serial.println("[AUTH] ACCESS DENIED");
         }

@@ -24,7 +24,7 @@ enum class State {
     void update();
 
     // Event handling interface for future expansion
-    void handleEvent(SystemEvent event);
+    void handleEvent(SystemEvent event, const uint8_t* uid = nullptr, uint8_t uidLength = 0);
 
     State getState() const;
 
@@ -47,7 +47,7 @@ private:
 
     void transitionTo(State newState);
 
-    void handleLockedState(SystemEvent event);
+    void handleLockedState(SystemEvent event, const uint8_t* uid, uint8_t uidLength);
     void handleSessionActiveState(SystemEvent event);
 };
 
