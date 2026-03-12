@@ -3,13 +3,17 @@
 
 #include <stdint.h>
 #include "system/session_record.h"
+#include "services/logging/log_manager.h"
 
 class AttendanceManager {
 public:
-    AttendanceManager();
+    AttendanceManager(LogManager* logManager);
 
     void onSessionStart(const SessionRecord& session);
     void onSessionEnd(const SessionRecord& session);
+    
+private:
+    LogManager* _logManager;
 };
 
 #endif

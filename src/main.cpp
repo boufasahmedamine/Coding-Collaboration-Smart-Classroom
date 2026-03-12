@@ -4,10 +4,12 @@
 #include "drivers/rfid/pn532.h"
 #include "services/auth/access_control.h"
 #include "services/attendance/attendance_manager.h"
+#include "services/logging/log_manager.h"
 #include "system/state_machine.h"
 
 DoorLock doorLock(PIN_DOOR_LOCK, true);
-AttendanceManager attendanceManager;
+LogManager logManager;
+AttendanceManager attendanceManager(&logManager);
 StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
 PN532Driver rfid;
 AccessControl accessControl;
