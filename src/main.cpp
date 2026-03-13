@@ -28,8 +28,8 @@ WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
 SDLogger sdLogger(5);
 LogManager logManager(&mqttManager, &sdLogger);
-AttendanceManager attendanceManager(&logManager);
-StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
+StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
+AttendanceManager attendanceManager(&logManager, &stateMachine);
 PN532Driver rfid;
 LD2410Driver presenceSensor(16, 17);
 LDRDriver lightSensor(34); // using pin 34 for analog input
@@ -86,6 +86,7 @@ void loop() {
     projectorLogic.update();
     heartbeat.update();
     stateMachine.update();
+    attendanceManager.update();
 
     if (presenceService.justBecameOccupied())
     {

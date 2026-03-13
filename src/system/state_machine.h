@@ -1,9 +1,11 @@
 #ifndef STATE_MACHINE_H
 #define STATE_MACHINE_H
 
-#include <stdint.h> // Added based on the provided snippet
-#include "drivers/doorlock/doorlock_driver.h" // Changed from door_lock.h
-#include "services/attendance/attendance_manager.h"
+#include <stdint.h>
+#include "drivers/doorlock/doorlock_driver.h"
+#include "system/session_record.h"
+
+class AttendanceManager;
 
 class StateMachine {
 public:
@@ -22,7 +24,7 @@ enum class SystemState { // Renamed from State
 
     static const unsigned long DEFAULT_SESSION_TIMEOUT_MS = 5400000; // 1.5 hours
 
-    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, AttendanceManager* attendanceManager = nullptr); // Changed DoorLock to DoorLockDriver, sessionDurationMs to sessionTimeoutMs
+    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs); // Removed AttendanceManager
 
     void init();
     void update();
@@ -31,6 +33,7 @@ enum class SystemState { // Renamed from State
     void handleEvent(SystemEvent event, const uint8_t* uid = nullptr, uint8_t uidLength = 0);
 
     SystemState getState() const; // Changed return type from State to SystemState
+    SessionRecord& getCurrentSession();
 
     // Future expansion hooks
     void setPresenceDetected(bool detected);
@@ -38,7 +41,6 @@ enum class SystemState { // Renamed from State
 
 private:
     DoorLockDriver& _doorLock; // Changed from DoorLock&
-    AttendanceManager* _attendanceManager;
 
     SystemState _currentState; // Changed type from State
 

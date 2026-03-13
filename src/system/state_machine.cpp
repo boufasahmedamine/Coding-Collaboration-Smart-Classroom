@@ -13,14 +13,13 @@ static const char* stateToString(StateMachine::SystemState state) {
 }
 #endif
 
-StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionDurationMs, AttendanceManager* attendanceManager)
+StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs)
     : _doorLock(doorLock),
       _currentState(SystemState::LOCKED),
       _sessionStartTime(0),
-      _sessionDurationMs(sessionDurationMs),
+      _sessionDurationMs(sessionTimeoutMs),
       _presenceDetected(false),
-      _overrideActive(false),
-      _attendanceManager(attendanceManager)
+      _overrideActive(false)
 {
     _session.active = false;
     _session.uidLength = 0;
@@ -97,20 +96,19 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
                                    if (uid != nullptr && uidLength > 0) {
                                    _session.uidLength = uidLength;
 
-                                   for (int i = 0; i < uidLength && i < 7; i++) {
-                                    _session.uid[i] = uid[i];
-                                  }
+                                   memcpy(_session.uid, uid, uidLength);
                              }
-
-               if (_attendanceManager) {
-                   _attendanceManager->onSessionStart(_session);
-               }
 
                transitionTo(SystemState::UNLOCKED);
             break;
 
         case SystemEvent::UNLOCK_REQUEST:
             Serial.println("[SM] Remote Unlock Request processed");
+            _session.startTime = millis();
+            _session.uidLength = 0; // Remote unlock might have no UID
+            _session.active = true;
+            _session.loggedStart = false;
+            _session.loggedEnd = false;
             transitionTo(SystemState::UNLOCKED);
             break;
 
@@ -118,6 +116,8 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
             _overrideActive = true;
             _session.startTime = millis();
             _session.active = true;
+            _session.loggedStart = false; // Override also starts a session, so initialize flags
+            _session.loggedEnd = false;
             transitionTo(SystemState::UNLOCKED);
             break;
 
@@ -198,10 +198,6 @@ void StateMachine::update() {
                 _session.endTime = millis();
                 _session.active = false;
 
-                if (_attendanceManager) {
-                    _attendanceManager->onSessionEnd(_session);
-                }
-
                 _doorLock.lock();
                 transitionTo(SystemState::LOCKED);
                 Serial.println("[SESSION] Session timeout reached. Locking door.");
@@ -210,8 +206,14 @@ void StateMachine::update() {
     }
 }
 
-StateMachine::SystemState StateMachine::getState() const {
+StateMachine::SystemState StateMachine::getState() const
+{
     return _currentState;
+}
+
+SessionRecord& StateMachine::getCurrentSession()
+{
+    return _session;
 }
 
 void StateMachine::setPresenceDetected(bool detected) {

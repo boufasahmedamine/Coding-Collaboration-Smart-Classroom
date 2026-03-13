@@ -9,6 +9,10 @@ struct SessionRecord {
     unsigned long startTime; // millis() at session start
     unsigned long endTime;   // millis() at session end
     bool active;
+
+    // Logging flags
+    bool loggedStart;
+    bool loggedEnd;
 };
 
 #endif
