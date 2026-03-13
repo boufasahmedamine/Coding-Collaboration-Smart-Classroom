@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "config/pins.h"
-#include "drivers/actuators/door_lock.h"
+#include "drivers/doorlock/doorlock_driver.h"
 #include "drivers/rfid/pn532.h"
 #include "drivers/ld2410/ld2410_driver.h"
 #include "drivers/ldr/ldr_driver.h"
@@ -14,7 +14,7 @@
 #include "communication/mqtt_manager.h"
 #include "system/state_machine.h"
 
-DoorLock doorLock(PIN_DOOR_LOCK, true);
+DoorLockDriver doorLock(PIN_DOOR_LOCK);
 
 WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
@@ -43,6 +43,7 @@ void setup() {
         Serial.println("[INFO] PN532 RFID reader initialized");
     }
 
+    doorLock.begin();
     stateMachine.init();
     wifiManager.begin();
     mqttManager.begin();

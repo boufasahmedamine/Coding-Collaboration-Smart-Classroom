@@ -1,8 +1,8 @@
 #ifndef STATE_MACHINE_H
 #define STATE_MACHINE_H
 
-#include "drivers/actuators/door_lock.h"
-#include "system/session_record.h"
+#include <stdint.h> // Added based on the provided snippet
+#include "drivers/doorlock/doorlock_driver.h" // Changed from door_lock.h
 #include "services/attendance/attendance_manager.h"
 
 class StateMachine {
@@ -14,12 +14,12 @@ public:
     OVERRIDE_ON,
     OVERRIDE_OFF
 };
-enum class State {
+enum class SystemState { // Renamed from State
     LOCKED,
-    SESSION_ACTIVE
+    UNLOCKED // Changed from SESSION_ACTIVE
 };
 
-    StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs, AttendanceManager* attendanceManager = nullptr);
+    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, AttendanceManager* attendanceManager = nullptr); // Changed DoorLock to DoorLockDriver, sessionDurationMs to sessionTimeoutMs
 
     void init();
     void update();
@@ -27,27 +27,27 @@ enum class State {
     // Event handling interface for future expansion
     void handleEvent(SystemEvent event, const uint8_t* uid = nullptr, uint8_t uidLength = 0);
 
-    State getState() const;
+    SystemState getState() const; // Changed return type from State to SystemState
 
     // Future expansion hooks
     void setPresenceDetected(bool detected);
     void setOverrideActive(bool active);
 
 private:
-    DoorLock& _doorLock;
+    DoorLockDriver& _doorLock; // Changed from DoorLock&
     AttendanceManager* _attendanceManager;
 
-    State _currentState;
+    SystemState _currentState; // Changed type from State
 
     unsigned long _sessionStartTime;
-    unsigned long _sessionDurationMs;
+    unsigned long _sessionDurationMs; // Kept as sessionDurationMs, as the instruction didn't explicitly change the member variable name.
 
     bool _presenceDetected;
     bool _overrideActive;
 
     SessionRecord _session;
 
-    void transitionTo(State newState);
+    void transitionTo(SystemState newState);
 
     void handleLockedState(SystemEvent event, const uint8_t* uid, uint8_t uidLength);
     void handleSessionActiveState(SystemEvent event);

@@ -1,9 +1,9 @@
 #include <Arduino.h>
 #include "config/pins.h"
-#include "drivers/actuators/door_lock.h"
+#include "drivers/doorlock/doorlock_driver.h"
 #include "system/state_machine.h"
 
-static DoorLock doorLock(PIN_DOOR_LOCK, true);
+static DoorLockDriver doorLock(PIN_DOOR_LOCK);
 static StateMachine stateMachine(doorLock, 5000);
 
 void runStateMachineTest() {
@@ -33,7 +33,7 @@ void runStateMachineTest() {
     if (millis() - lastPrint > 1000) {
         lastPrint = millis();
 
-        if (stateMachine.getState() == StateMachine::State::LOCKED)
+        if (stateMachine.getState() == StateMachine::SystemState::LOCKED)
             Serial.println("State: LOCKED");
         else
             Serial.println("State: UNLOCKED");

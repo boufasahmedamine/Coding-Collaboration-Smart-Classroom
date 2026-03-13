@@ -4,18 +4,18 @@
 //#define DEBUG_STATE_MACHINE
 
 #ifdef DEBUG_STATE_MACHINE
-static const char* stateToString(StateMachine::State state) {
+static const char* stateToString(StateMachine::SystemState state) {
     switch (state) {
-        case StateMachine::State::LOCKED: return "LOCKED";
-        case StateMachine::State::SESSION_ACTIVE: return "SESSION_ACTIVE";
+        case StateMachine::SystemState::LOCKED: return "LOCKED";
+        case StateMachine::SystemState::UNLOCKED: return "UNLOCKED";
         default: return "UNKNOWN";
     }
 }
 #endif
 
-StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs, AttendanceManager* attendanceManager)
+StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionDurationMs, AttendanceManager* attendanceManager)
     : _doorLock(doorLock),
-      _currentState(State::LOCKED),
+      _currentState(SystemState::LOCKED),
       _sessionStartTime(0),
       _sessionDurationMs(sessionDurationMs),
       _presenceDetected(false),
@@ -32,18 +32,18 @@ StateMachine::StateMachine(DoorLock& doorLock, unsigned long sessionDurationMs, 
 }
 
 void StateMachine::init() {
-    _doorLock.init();
+    _doorLock.begin();
     _session.active = false;
-    transitionTo(State::LOCKED);
+    transitionTo(SystemState::LOCKED);
 }
 
-void StateMachine::transitionTo(State newState) {
+void StateMachine::transitionTo(SystemState newState) {
     if (_currentState == newState) {
         return;
     }
 
 #ifdef DEBUG_STATE_MACHINE
-    State oldState = _currentState;
+    SystemState oldState = _currentState;
 #endif
 
     _currentState = newState;
@@ -57,12 +57,12 @@ void StateMachine::transitionTo(State newState) {
 
     switch (_currentState) {
 
-        case State::SESSION_ACTIVE:
+        case SystemState::UNLOCKED:
             _doorLock.unlock();
             _sessionStartTime = millis();
             break;
 
-        case State::LOCKED:
+        case SystemState::LOCKED:
             break;
 
         default:
@@ -74,11 +74,11 @@ void StateMachine::handleEvent(SystemEvent event, const uint8_t* uid, uint8_t ui
 
     switch (_currentState) {
 
-        case State::LOCKED:
+        case SystemState::LOCKED:
             handleLockedState(event, uid, uidLength);
             break;
 
-        case State::SESSION_ACTIVE:
+        case SystemState::UNLOCKED:
             handleSessionActiveState(event);
             break;
 
@@ -106,14 +106,14 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
                    _attendanceManager->onSessionStart(_session);
                }
 
-               transitionTo(State::SESSION_ACTIVE);
+               transitionTo(SystemState::UNLOCKED);
             break;
 
         case SystemEvent::OVERRIDE_ON:
             _overrideActive = true;
             _session.startTime = millis();
             _session.active = true;
-            transitionTo(State::SESSION_ACTIVE);
+            transitionTo(SystemState::UNLOCKED);
             break;
 
         case SystemEvent::OVERRIDE_OFF:
@@ -177,7 +177,7 @@ Timeout Semantics (Phase 7 Formalization)
 8. Lock occurs immediately once all blocking conditions are cleared.
 */
 void StateMachine::update() {
-    if (_currentState == State::SESSION_ACTIVE) {
+    if (_currentState == SystemState::UNLOCKED) {
 
         // Safety override always keeps it unlocked
         if (_overrideActive) {
@@ -198,13 +198,13 @@ void StateMachine::update() {
                 }
 
                 _doorLock.lock();
-                transitionTo(State::LOCKED);
+                transitionTo(SystemState::LOCKED);
             }
         }
     }
 }
 
-StateMachine::State StateMachine::getState() const {
+StateMachine::SystemState StateMachine::getState() const {
     return _currentState;
 }
 
@@ -216,7 +216,7 @@ void StateMachine::setOverrideActive(bool active) {
     _overrideActive = active;
 
     // Immediate unlock if override activated
-    if (_overrideActive && _currentState == State::LOCKED) {
-        transitionTo(State::SESSION_ACTIVE);
+    if (_overrideActive && _currentState == SystemState::LOCKED) {
+        transitionTo(SystemState::UNLOCKED);
     }
 }
