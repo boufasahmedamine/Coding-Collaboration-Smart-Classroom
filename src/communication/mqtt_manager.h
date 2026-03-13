@@ -4,6 +4,8 @@
 #include <PubSubClient.h>
 #include <WiFiClient.h>
 
+class CommandHandler;
+
 class MQTTManager
 {
 public:
@@ -15,14 +17,18 @@ public:
     bool isConnected();
     void publish(const char* topic, const char* message);
 
+    void setCommandHandler(CommandHandler* handler);
+
 private:
     const char* _broker;
     int _port;
 
     WiFiClient _wifiClient;
     PubSubClient _client;
+    CommandHandler* _commandHandler;
 
     void reconnect();
+    void callback(char* topic, byte* payload, unsigned int length);
 };
 
 #endif

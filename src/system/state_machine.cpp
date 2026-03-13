@@ -109,6 +109,11 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
                transitionTo(SystemState::UNLOCKED);
             break;
 
+        case SystemEvent::UNLOCK_REQUEST:
+            Serial.println("[SM] Remote Unlock Request processed");
+            transitionTo(SystemState::UNLOCKED);
+            break;
+
         case SystemEvent::OVERRIDE_ON:
             _overrideActive = true;
             _session.startTime = millis();

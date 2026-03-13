@@ -13,6 +13,7 @@
 #include "services/automation/automation_controller.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_manager.h"
+#include "services/network/command_handler.h"
 #include "services/system/heartbeat_service.h"
 #include "system/state_machine.h"
 
@@ -31,6 +32,7 @@ PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
 AutomationController automationController(&presenceService, &lightService);
 HeartbeatService heartbeat(&mqttManager);
+CommandHandler commandHandler(&stateMachine);
 AccessControl accessControl;
 
 void setup() {
@@ -47,6 +49,7 @@ void setup() {
     doorLock.begin();
     stateMachine.init();
     wifiManager.begin();
+    mqttManager.setCommandHandler(&commandHandler);
     mqttManager.begin();
     presenceSensor.begin();
     lightSensor.begin();
@@ -91,6 +94,13 @@ void loop() {
         } else if (c == 'u') {
             Serial.println("[EVENT] Session Start Requested");
             stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+        } else if (c == 'm') {
+            // Phase 25: MQTT Command Simulation Test
+            // This case simulates a remote "unlock" command being received via MQTT.
+            // Useful for testing command routing without a live broker.
+            // TODO: Remove this simulation in production if needed.
+            Serial.println("[SIM] Simulating MQTT 'unlock' command");
+            commandHandler.handleCommand("unlock");
         }
     }
 

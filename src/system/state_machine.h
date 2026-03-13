@@ -12,7 +12,8 @@ public:
     PRESENCE_DETECTED,
     PRESENCE_LOST,
     OVERRIDE_ON,
-    OVERRIDE_OFF
+    OVERRIDE_OFF,
+    UNLOCK_REQUEST
 };
 enum class SystemState { // Renamed from State
     LOCKED,
