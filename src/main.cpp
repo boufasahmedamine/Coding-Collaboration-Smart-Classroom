@@ -12,6 +12,7 @@
 #include "services/automation/automation_controller.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_manager.h"
+#include "services/system/heartbeat_service.h"
 #include "system/state_machine.h"
 
 DoorLockDriver doorLock(PIN_DOOR_LOCK);
@@ -27,10 +28,8 @@ LDRDriver lightSensor(34); // using pin 34 for analog input
 PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
 AutomationController automationController(&presenceService, &lightService);
+HeartbeatService heartbeat(&mqttManager);
 AccessControl accessControl;
-
-unsigned long lastHeartbeat = 0;
-const unsigned long HEARTBEAT_INTERVAL = 10000;  // every 10 seconds
 
 void setup() {
     Serial.begin(115200);
@@ -61,6 +60,7 @@ void loop() {
     presenceService.update();
     lightService.update();
     automationController.update();
+    heartbeat.update();
     stateMachine.update();
 
     if (presenceService.justBecameOccupied())
@@ -109,14 +109,6 @@ void loop() {
         } else {
             Serial.println("[AUTH] ACCESS DENIED");
         }
-    }
-
-    // ---- Heartbeat ----
-    if (millis() - lastHeartbeat >= HEARTBEAT_INTERVAL) {
-        Serial.print("[ALIVE] ");
-        Serial.print(millis() / 1000);
-        Serial.println("s");
-        lastHeartbeat = millis();
     }
 
     delay(10);
