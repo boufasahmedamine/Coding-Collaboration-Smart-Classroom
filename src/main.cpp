@@ -7,6 +7,7 @@
 #include "services/auth/access_control.h"
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
+#include "services/logging/sd_logger.h"
 #include "services/automation/presence_service.h"
 #include "services/automation/light_service.h"
 #include "services/automation/automation_controller.h"
@@ -19,7 +20,8 @@ DoorLockDriver doorLock(PIN_DOOR_LOCK);
 
 WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
-LogManager logManager(&mqttManager);
+SDLogger sdLogger(5);
+LogManager logManager(&mqttManager, &sdLogger);
 AttendanceManager attendanceManager(&logManager);
 StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
 PN532Driver rfid;
@@ -48,6 +50,7 @@ void setup() {
     mqttManager.begin();
     presenceSensor.begin();
     lightSensor.begin();
+    sdLogger.begin();
 
     Serial.println("[INFO] Type 'u' to request unlock");
 }

@@ -1,8 +1,9 @@
 #include "services/logging/log_manager.h"
 #include <Arduino.h>
 
-LogManager::LogManager(MQTTManager* mqtt)
-    : _mqtt(mqtt)
+LogManager::LogManager(MQTTManager* mqtt, SDLogger* sd)
+    : _mqtt(mqtt),
+      _sd(sd)
 {
 }
 
@@ -22,6 +23,11 @@ void LogManager::logSessionStart(const SessionRecord& session)
     {
         _mqtt->publish("zarzara/session/start", "session_started");
     }
+
+    if (_sd)
+    {
+        _sd->log("Session started");
+    }
 }
 
 void LogManager::logSessionEnd(const SessionRecord& session)
@@ -36,5 +42,10 @@ void LogManager::logSessionEnd(const SessionRecord& session)
     if (_mqtt && _mqtt->isConnected())
     {
         _mqtt->publish("zarzara/session/end", "session_ended");
+    }
+
+    if (_sd)
+    {
+        _sd->log("Session ended");
     }
 }
