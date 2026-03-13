@@ -40,8 +40,7 @@ Follow this structure for all new files:
 
 
 ZARZARA Smart Classroom – Firmware AI Context
-Project Summary
-
+Project Summary :
 Firmware for a Smart Classroom Node built on ESP32-WROOM-32U.
 
 Main capabilities:
