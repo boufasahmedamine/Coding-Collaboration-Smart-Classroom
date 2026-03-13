@@ -204,6 +204,7 @@ void StateMachine::update() {
 
                 _doorLock.lock();
                 transitionTo(SystemState::LOCKED);
+                Serial.println("[SESSION] Session timeout reached. Locking door.");
             }
         }
     }

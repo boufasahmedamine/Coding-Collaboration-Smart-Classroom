@@ -20,6 +20,8 @@ enum class SystemState { // Renamed from State
     UNLOCKED // Changed from SESSION_ACTIVE
 };
 
+    static const unsigned long DEFAULT_SESSION_TIMEOUT_MS = 5400000; // 1.5 hours
+
     StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, AttendanceManager* attendanceManager = nullptr); // Changed DoorLock to DoorLockDriver, sessionDurationMs to sessionTimeoutMs
 
     void init();
