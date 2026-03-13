@@ -2,6 +2,7 @@
 #include "config/pins.h"
 #include "drivers/actuators/door_lock.h"
 #include "drivers/rfid/pn532.h"
+#include "drivers/ld2410/ld2410_driver.h"
 #include "services/auth/access_control.h"
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
@@ -10,13 +11,15 @@
 #include "system/state_machine.h"
 
 DoorLock doorLock(PIN_DOOR_LOCK, true);
-LogManager logManager;
-AttendanceManager attendanceManager(&logManager);
+
 WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
 LogManager logManager(&mqttManager);
 AttendanceManager attendanceManager(&logManager);
 StateMachine stateMachine(doorLock, 5400000, &attendanceManager); // 1.5 hours
+PN532Driver rfid;
+LD2410Driver presenceSensor(16, 17);
+AccessControl accessControl;
 
 unsigned long lastHeartbeat = 0;
 const unsigned long HEARTBEAT_INTERVAL = 10000;  // every 10 seconds
@@ -35,6 +38,7 @@ void setup() {
     stateMachine.init();
     wifiManager.begin();
     mqttManager.begin();
+    presenceSensor.begin();
 
     Serial.println("[INFO] Type 'u' to request unlock");
 }
@@ -42,6 +46,7 @@ void setup() {
 void loop() {
     wifiManager.update();
     mqttManager.update();
+    presenceSensor.update();
     stateMachine.update();
 
     // ---- Serial Input Handler ----
