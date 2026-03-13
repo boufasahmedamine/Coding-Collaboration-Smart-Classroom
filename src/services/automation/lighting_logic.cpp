@@ -1,17 +1,21 @@
 #include "services/automation/lighting_logic.h"
 
-LightingLogic::LightingLogic(Lighting& lights, OccupancyLogic& occupancy)
-    : _lights(lights), _occupancy(occupancy), _lastState(false)
+LightingLogic::LightingLogic(Lighting& lights, OccupancyLogic& occupancy, LDRDriver& ldr)
+    : _lights(lights), _occupancy(occupancy), _ldr(ldr), _lastState(false)
 {
 }
 
 void LightingLogic::update()
 {
-    bool currentlyOccupied = _occupancy.isOccupied();
+    bool presence = _occupancy.isOccupied();
+    int lightLevel = _ldr.getLightLevel();
     
-    if (currentlyOccupied != _lastState)
+    // Automation Rule: Lights ON if presence detected AND it is dark enough
+    bool shouldBeOn = presence && (lightLevel < LIGHT_THRESHOLD);
+    
+    if (shouldBeOn != _lastState)
     {
-        if (currentlyOccupied)
+        if (shouldBeOn)
         {
             _lights.turnOn();
         }
@@ -19,6 +23,6 @@ void LightingLogic::update()
         {
             _lights.turnOff();
         }
-        _lastState = currentlyOccupied;
+        _lastState = shouldBeOn;
     }
 }

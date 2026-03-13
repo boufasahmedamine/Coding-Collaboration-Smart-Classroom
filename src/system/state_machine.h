@@ -36,6 +36,8 @@ enum class SystemState { // Renamed from State
     SessionRecord& getCurrentSession();
 
     // Future expansion hooks
+    bool isSessionActive() const;
+    bool isOverrideActive() const;
     void setPresenceDetected(bool detected);
     void setOverrideActive(bool active);
 

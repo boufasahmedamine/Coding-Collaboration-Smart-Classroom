@@ -41,8 +41,8 @@ Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
 
 OccupancyLogic occupancy(presenceSensor);
-LightingLogic lightingLogic(lightingDriver, occupancy);
-ProjectorLogic projectorLogic(projectorDriver, stateMachine);
+LightingLogic lightingLogic(lightingDriver, occupancy, lightSensor);
+ProjectorLogic projectorLogic(projectorDriver, stateMachine, occupancy);
 
 HeartbeatService heartbeat(&mqttManager);
 CommandHandler commandHandler(&stateMachine);
@@ -60,14 +60,14 @@ void setup() {
     }
 
     doorLock.begin();
-    stateMachine.init();
-    wifiManager.begin();
-    mqttManager.setCommandHandler(&commandHandler);
-    mqttManager.begin();
-    presenceSensor.begin();
-    lightSensor.begin();
     lightingDriver.begin();
     projectorDriver.begin();
+    
+    // Safety: ensure actuators are off
+    lightingDriver.turnOff();
+    projectorDriver.turnOff();
+    
+    stateMachine.init();
     sdLogger.begin();
 
     Serial.println("[INFO] Type 'u' to request unlock");
@@ -87,6 +87,8 @@ void loop() {
     heartbeat.update();
     stateMachine.update();
     attendanceManager.update();
+    
+    // Future: logManager.processQueue() if asynchronous logging is needed
 
     if (presenceService.justBecameOccupied())
     {

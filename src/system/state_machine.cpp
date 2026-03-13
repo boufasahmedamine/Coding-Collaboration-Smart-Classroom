@@ -220,6 +220,14 @@ void StateMachine::setPresenceDetected(bool detected) {
     _presenceDetected = detected;
 }
 
+bool StateMachine::isSessionActive() const {
+    return _session.active;
+}
+
+bool StateMachine::isOverrideActive() const {
+    return _overrideActive;
+}
+
 void StateMachine::setOverrideActive(bool active) {
     _overrideActive = active;
 
