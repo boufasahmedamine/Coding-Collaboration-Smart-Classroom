@@ -11,6 +11,11 @@
 #include "services/automation/presence_service.h"
 #include "services/automation/light_service.h"
 #include "services/automation/automation_controller.h"
+#include "services/automation/occupancy_logic.h"
+#include "services/automation/lighting_logic.h"
+#include "services/automation/projector_logic.h"
+#include "drivers/actuators/lighting.h"
+#include "drivers/actuators/ir_projector.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_manager.h"
 #include "services/network/command_handler.h"
@@ -31,6 +36,14 @@ LDRDriver lightSensor(34); // using pin 34 for analog input
 PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
 AutomationController automationController(&presenceService, &lightService);
+
+Lighting lightingDriver(PIN_LIGHTING);
+IRProjector projectorDriver(PIN_PROJECTOR);
+
+OccupancyLogic occupancy(presenceSensor);
+LightingLogic lightingLogic(lightingDriver, occupancy);
+ProjectorLogic projectorLogic(projectorDriver, stateMachine);
+
 HeartbeatService heartbeat(&mqttManager);
 CommandHandler commandHandler(&stateMachine);
 AccessControl accessControl;
@@ -53,6 +66,8 @@ void setup() {
     mqttManager.begin();
     presenceSensor.begin();
     lightSensor.begin();
+    lightingDriver.begin();
+    projectorDriver.begin();
     sdLogger.begin();
 
     Serial.println("[INFO] Type 'u' to request unlock");
@@ -66,6 +81,9 @@ void loop() {
     presenceService.update();
     lightService.update();
     automationController.update();
+    occupancy.update();
+    lightingLogic.update();
+    projectorLogic.update();
     heartbeat.update();
     stateMachine.update();
 
