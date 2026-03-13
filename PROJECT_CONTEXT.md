@@ -1,7 +1,7 @@
 # ZARZARA Smart Classroom - Firmware Context
 
 ## Project Overview
-Firmware for ESP32-WROOM-32U node handling RFID Access, mmWave Presence (LD2410), Lux Sensing (VEML7700), IR Control, and MQTT Comm.
+Firmware for ESP32-WROOM-32U node handling RFID Access, mmWave Presence (LD2410), Lux Sensing (simple LDRs), IR Control, and MQTT Comm.
 
 ## Architecture Laws (Strict Enforcement)
 This project follows a **Strict Layered Architecture**. Do not allow cross-layer contamination.
@@ -21,7 +21,7 @@ This project follows a **Strict Layered Architecture**. Do not allow cross-layer
 
 ## Hardware Mapping
 - **MCU:** ESP32-WROOM-32U
-- **Inputs:** 2x PN532 (SPI), LD2410 (UART), VEML7700 (I2C), DS3231 (I2C), Reed Switch, Exit Button.
+- **Inputs:** 2x PN532 (SPI), LD2410 (UART), LDRs (Analog), DS3231 (I2C), Reed Switch, Exit Button.
 - **Outputs:** Maglock (MOSFET), SSR (Lighting), IR LED (Transistor), Buzzers, RGB LEDs.
 - **Storage:** MicroSD (SPI).
 
@@ -52,7 +52,7 @@ Attendance tracking
 
 Presence detection (LD2410 mmWave)
 
-Ambient light sensing (VEML7700)
+Ambient light sensing (LDRs)
 
 Door lock control (MOSFET maglock)
 
@@ -112,7 +112,7 @@ drivers
 
 control specific devices
 
-examples: PN532, LD2410, VEML7700
+examples: PN532, LD2410, LDRs
 
 may call HAL
 
@@ -237,7 +237,7 @@ Inputs
 
 2× PN532 RFID (SPI)
 LD2410 presence radar (UART)
-VEML7700 lux sensor (I2C)
+LDRs (Analog)
 DS3231 RTC (I2C)
 Reed switch
 Exit push button
@@ -269,7 +269,7 @@ hal/
 drivers/
     rfid/pn532.*
     sensors/ld2410.*
-    sensors/veml7700.*
+    sensors/LDR.*
     storage/sdcard.*
     storage/rtc_ds3231.*
     actuators/door_lock.*
