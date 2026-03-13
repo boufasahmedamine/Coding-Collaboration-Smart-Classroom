@@ -9,6 +9,7 @@
 #include "services/logging/log_manager.h"
 #include "services/automation/presence_service.h"
 #include "services/automation/light_service.h"
+#include "services/automation/automation_controller.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_manager.h"
 #include "system/state_machine.h"
@@ -25,6 +26,7 @@ LD2410Driver presenceSensor(16, 17);
 LDRDriver lightSensor(34); // using pin 34 for analog input
 PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
+AutomationController automationController(&presenceService, &lightService);
 AccessControl accessControl;
 
 unsigned long lastHeartbeat = 0;
@@ -57,6 +59,7 @@ void loop() {
     lightSensor.update();
     presenceService.update();
     lightService.update();
+    automationController.update();
     stateMachine.update();
 
     if (presenceService.justBecameOccupied())
