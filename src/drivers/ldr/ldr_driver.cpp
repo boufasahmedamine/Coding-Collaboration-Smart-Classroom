@@ -14,7 +14,19 @@ void LDRDriver::begin()
 
 void LDRDriver::update()
 {
-    _lightLevel = analogRead(_pin);
+    const int samples = 10;
+    long total = 0;
+
+    for (int i = 0; i < samples; i++)
+    {
+        total += analogRead(_pin);
+        delayMicroseconds(200);
+    }
+
+    int raw = total / samples;
+
+    // Trick 2: temporal low-pass filter
+    _lightLevel = (_lightLevel * 3 + raw) / 4;
 }
 
 int LDRDriver::getLightLevel()

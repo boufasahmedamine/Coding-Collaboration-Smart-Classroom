@@ -8,6 +8,7 @@
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
 #include "services/automation/presence_service.h"
+#include "services/automation/light_service.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_manager.h"
 #include "system/state_machine.h"
@@ -23,6 +24,7 @@ PN532Driver rfid;
 LD2410Driver presenceSensor(16, 17);
 LDRDriver lightSensor(34); // using pin 34 for analog input
 PresenceService presenceService(&presenceSensor);
+LightService lightService(&lightSensor);
 AccessControl accessControl;
 
 unsigned long lastHeartbeat = 0;
@@ -54,6 +56,7 @@ void loop() {
     presenceSensor.update();
     lightSensor.update();
     presenceService.update();
+    lightService.update();
     stateMachine.update();
 
     if (presenceService.justBecameOccupied())
@@ -64,6 +67,11 @@ void loop() {
     if (presenceService.justBecameEmpty())
     {
         Serial.println("[PRESENCE] Room became empty");
+    }
+
+    if (lightService.isDark())
+    {
+        Serial.println("[LIGHT] Room is dark");
     }
 
     // ---- Serial Input Handler ----
