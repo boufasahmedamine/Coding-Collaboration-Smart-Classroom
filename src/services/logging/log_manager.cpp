@@ -9,43 +9,52 @@ LogManager::LogManager(MQTTManager* mqtt, SDLogger* sd)
 
 void LogManager::logSessionStart(const SessionRecord& session)
 {
-    Serial.print("[LOG] Session start UID: ");
-
-    for (int i = 0; i < session.uidLength; i++)
-    {
-        Serial.print(session.uid[i], HEX);
-        Serial.print(" ");
-    }
-
-    Serial.println();
+    String logMsg = formatSessionStart(session);
+    Serial.println("[LOG] " + logMsg);
 
     if (_mqtt && _mqtt->isConnected())
     {
-        _mqtt->publish("zarzara/session/start", "session_started");
+        _mqtt->publish("classroom/attendance/start", logMsg.c_str());
     }
 
     if (_sd)
     {
-        _sd->log("Session started");
+        _sd->log(logMsg.c_str());
     }
 }
 
 void LogManager::logSessionEnd(const SessionRecord& session)
 {
-    Serial.print("[LOG] Session end duration: ");
-
-    unsigned long duration = session.endTime - session.startTime;
-
-    Serial.print(duration / 1000);
-    Serial.println(" seconds");
+    String logMsg = formatSessionEnd(session);
+    Serial.println("[LOG] " + logMsg);
 
     if (_mqtt && _mqtt->isConnected())
     {
-        _mqtt->publish("zarzara/session/end", "session_ended");
+        _mqtt->publish("classroom/attendance/end", logMsg.c_str());
     }
 
     if (_sd)
     {
-        _sd->log("Session ended");
+        _sd->log(logMsg.c_str());
     }
+}
+
+String LogManager::formatSessionStart(const SessionRecord& session) 
+{
+    String line = "START,UID:";
+    for (int i = 0; i < session.uidLength; i++) {
+        line += String(session.uid[i], HEX) + " ";
+    }
+    line += ",TIME:" + String(session.startTime);
+    return line;
+}
+
+String LogManager::formatSessionEnd(const SessionRecord& session) 
+{
+    String line = "END,UID:";
+    for (int i = 0; i < session.uidLength; i++) {
+        line += String(session.uid[i], HEX) + " ";
+    }
+    line += ",TIME:" + String(session.endTime);
+    return line;
 }

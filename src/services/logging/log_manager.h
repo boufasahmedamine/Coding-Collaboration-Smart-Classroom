@@ -16,6 +16,9 @@ public:
 private:
     MQTTManager* _mqtt;
     SDLogger* _sd;
+
+    String formatSessionStart(const SessionRecord& session);
+    String formatSessionEnd(const SessionRecord& session);
 };
 
 #endif
