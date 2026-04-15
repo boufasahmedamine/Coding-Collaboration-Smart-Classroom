@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <ld2410.h>
 
 class LD2410Driver
 {
@@ -21,7 +22,10 @@ private:
     int _txPin;
 
     bool _presence;
+    bool _initialized;
+    
     QueueHandle_t _simQueue;
+    ld2410 _radar;
 };
 
 #endif

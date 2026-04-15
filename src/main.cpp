@@ -97,6 +97,103 @@ void vTaskSerialRouter(void *pvParameters) {
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
+void vTaskRFID(void *pvParameters) {
+    uint8_t uid[7];
+    uint8_t uidLength;
+    for (;;) {
+        bool cardRead = false;
+        if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
+            cardRead = rfid.readCard(uid, &uidLength);
+            xSemaphoreGive(xMutex_SPIBus);
+        }
+
+        if (cardRead) {
+            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) {
+                Serial.print("Card detected UID: ");
+                for (int i = 0; i < uidLength; i++) {
+                    Serial.print(uid[i], HEX);
+                    Serial.print(" ");
+                }
+                Serial.println();
+                xSemaphoreGive(xMutex_Serial);
+            }
+
+            if (accessControl.isAuthorized(uid, uidLength)) {
+                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[AUTH] ACCESS GRANTED"); xSemaphoreGive(xMutex_Serial); }
+                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                    stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED, uid, uidLength);
+                    xSemaphoreGive(xMutex_StateMachine);
+                }
+            } else {
+                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[AUTH] ACCESS DENIED"); xSemaphoreGive(xMutex_Serial); }
+            }
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS); // Poll RFID at 10Hz
+    }
+}
+
+void vTaskLogging(void *pvParameters) {
+    for (;;) {
+        // Attendance Manager uses LogManager, which uses SDLogger (SPI).
+        // Wrapping in SPI Mutex ensures we don't collide with the RFID SPI transaction.
+        if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
+            attendanceManager.update();
+            xSemaphoreGive(xMutex_SPIBus);
+        }
+        vTaskDelay(500 / portTICK_PERIOD_MS); // Background logging checks at 2Hz
+    }
+}
+
+void vTaskCoreLogic(void *pvParameters) {
+    for (;;) {
+        presenceSensor.update();
+        lightSensor.update();
+        presenceService.update();
+        lightService.update();
+        automationController.update();
+        occupancy.update();
+        lightingLogic.update();
+        projectorLogic.update();
+        
+        // Safety lock around state machine updates if network task commands it concurrently
+        if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+            stateMachine.update();
+            xSemaphoreGive(xMutex_StateMachine);
+        }
+
+        if (presenceService.justBecameOccupied()) {
+            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[PRESENCE] Room became occupied"); xSemaphoreGive(xMutex_Serial); }
+        }
+        if (presenceService.justBecameEmpty()) {
+            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[PRESENCE] Room became empty"); xSemaphoreGive(xMutex_Serial); }
+        }
+        if (lightService.isDark()) {
+            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[LIGHT] Room is dark"); xSemaphoreGive(xMutex_Serial); }
+        }
+
+        // ---- Simulated Input Handler (from Queue) ----
+        char c;
+        if (xQueueReceive(xQueue_SimCommand_Main, &c, 0) == pdTRUE) {
+            if (c == 'c') {
+                rfid.simulateCardDetected();
+            } else if (c == 'u') {
+                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[EVENT] Session Start Requested"); xSemaphoreGive(xMutex_Serial); }
+                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                    stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+                    xSemaphoreGive(xMutex_StateMachine);
+                }
+            } else if (c == 'm') {
+                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[SIM] Simulating MQTT 'unlock' command"); xSemaphoreGive(xMutex_Serial); }
+                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                    commandHandler.handleCommand("unlock");
+                    xSemaphoreGive(xMutex_StateMachine);
+                }
+            }
+        }
+        
+        vTaskDelay(50 / portTICK_PERIOD_MS); // Logic engine runs at 20Hz
+    }
+}
 // ----------------------
 
 void setup() {
@@ -135,6 +232,11 @@ void setup() {
     xTaskCreatePinnedToCore(vTaskNetwork, "NetworkTask", 8192, NULL, 2, NULL, 0);
     xTaskCreatePinnedToCore(vTaskSerialRouter, "SerialRouter", 2048, NULL, 1, NULL, 0);
 
+    // Core 1 Tasks (Application Logic + Sensors)
+    xTaskCreatePinnedToCore(vTaskRFID, "RFIDTask", 4096, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(vTaskLogging, "LoggingTask", 6144, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(vTaskCoreLogic, "CoreLogic", 8192, NULL, 2, NULL, 1);
+
     if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) {
         Serial.println("[INFO] Type 'u' to request unlock");
         xSemaphoreGive(xMutex_Serial);
@@ -142,94 +244,8 @@ void setup() {
 }
 
 void loop() {
-    presenceSensor.update();
-    lightSensor.update();
-    presenceService.update();
-    lightService.update();
-    automationController.update();
-    occupancy.update();
-    lightingLogic.update();
-    projectorLogic.update();
-    
-    // Safety lock around state machine updates if network task commands it concurrently
-    if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-        stateMachine.update();
-        xSemaphoreGive(xMutex_StateMachine);
-    }
-    
-    attendanceManager.update();
-    
-    // Future: logManager.processQueue() if asynchronous logging is needed
-
-    if (presenceService.justBecameOccupied())
-    {
-        if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[PRESENCE] Room became occupied"); xSemaphoreGive(xMutex_Serial); }
-    }
-
-    if (presenceService.justBecameEmpty())
-    {
-        if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[PRESENCE] Room became empty"); xSemaphoreGive(xMutex_Serial); }
-    }
-
-    if (lightService.isDark())
-    {
-        if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[LIGHT] Room is dark"); xSemaphoreGive(xMutex_Serial); }
-    }
-
-    // ---- Simulated Input Handler (from Queue) ----
-    char c;
-    if (xQueueReceive(xQueue_SimCommand_Main, &c, 0) == pdTRUE) {
-        if (c == 'c') {
-            rfid.simulateCardDetected();
-        } else if (c == 'u') {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[EVENT] Session Start Requested"); xSemaphoreGive(xMutex_Serial); }
-            if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
-                xSemaphoreGive(xMutex_StateMachine);
-            }
-        } else if (c == 'm') {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[SIM] Simulating MQTT 'unlock' command"); xSemaphoreGive(xMutex_Serial); }
-            // Note: CommandHandler eventually calls StateMachine, so we lock StateMachine if needed,
-            // but for safety, we rely on the Mutex inside handleCommand or before calling it.
-            if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                commandHandler.handleCommand("unlock");
-                xSemaphoreGive(xMutex_StateMachine);
-            }
-        }
-    }
-
-    // ---- RFID Card Detection & Authorization ----
-    uint8_t uid[7];
-    uint8_t uidLength;
-
-    // Simulate SPI mutex requirement
-    bool cardRead = false;
-    if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
-        cardRead = rfid.readCard(uid, &uidLength);
-        xSemaphoreGive(xMutex_SPIBus);
-    }
-
-    if (cardRead) {
-        if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) {
-            Serial.print("Card detected UID: ");
-            for (int i = 0; i < uidLength; i++) {
-                Serial.print(uid[i], HEX);
-                Serial.print(" ");
-            }
-            Serial.println();
-            xSemaphoreGive(xMutex_Serial);
-        }
-
-        if (accessControl.isAuthorized(uid, uidLength)) {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[AUTH] ACCESS GRANTED"); xSemaphoreGive(xMutex_Serial); }
-            if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED, uid, uidLength);
-                xSemaphoreGive(xMutex_StateMachine);
-            }
-        } else {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[AUTH] ACCESS DENIED"); xSemaphoreGive(xMutex_Serial); }
-        }
-    }
-
-    delay(10);
+    // The main loop is intentionally left empty.
+    // Under FreeRTOS, Arduino's loop() runs as a Core 1 task.
+    // We delay it infinitely so the scheduler fully yields to our custom tasks.
+    vTaskDelay(portMAX_DELAY);
 }
