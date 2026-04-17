@@ -1,4 +1,5 @@
 #include "drivers/rfid/pn532.h"
+#include "system/diagnostics.h"
 #include <string.h>
 
 PN532Driver::PN532Driver(uint8_t csPin)
@@ -12,7 +13,7 @@ bool PN532Driver::init() {
 
     uint32_t versiondata = _nfc->getFirmwareVersion();
     if (!versiondata) {
-        Serial.println("[PN532] HARDWARE NOT FOUND. Check wiring.");
+        Diagnostics::logEvent("PN532 HARDWARE NOT FOUND");
         // Still returning true so simulation commands can work, but mark hardware as detached.
         // In a strict production system, we might return false here.
         _initialized = false;
@@ -20,7 +21,7 @@ bool PN532Driver::init() {
     }
 
     _nfc->SAMConfig();
-    Serial.println("[PN532] HARDWARE DRIVER INITIALIZED");
+    Diagnostics::logEvent("PN532 DRIVER INITIALIZED");
 
     _initialized = true;
     return true;
@@ -37,7 +38,7 @@ bool PN532Driver::readCard(uint8_t* uidBuffer, uint8_t* uidLength) {
         uint8_t simulatedUID[4] = {0xDE, 0xAD, 0xBE, 0xEF};
         memcpy(uidBuffer, simulatedUID, 4);
         *uidLength = 4;
-        Serial.println("[PN532] SIMULATED CARD DETECTED");
+        Diagnostics::logEvent("SIMULATED CARD DETECTED");
         _simulateCard = false;
         return true;
     }

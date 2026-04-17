@@ -1,9 +1,9 @@
 #include "system/state_machine.h"
+#include "system/diagnostics.h"
 #include <Arduino.h>
 
 //#define DEBUG_STATE_MACHINE
 
-#ifdef DEBUG_STATE_MACHINE
 static const char* stateToString(StateMachine::SystemState state) {
     switch (state) {
         case StateMachine::SystemState::LOCKED: return "LOCKED";
@@ -11,7 +11,6 @@ static const char* stateToString(StateMachine::SystemState state) {
         default: return "UNKNOWN";
     }
 }
-#endif
 
 StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs)
     : _doorLock(doorLock),
@@ -46,6 +45,8 @@ void StateMachine::transitionTo(SystemState newState) {
 #endif
 
     _currentState = newState;
+
+    Diagnostics::setSystemState(stateToString(_currentState));
 
 #ifdef DEBUG_STATE_MACHINE
     Serial.print("[SM] ");
@@ -103,7 +104,7 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
             break;
 
         case SystemEvent::UNLOCK_REQUEST:
-            Serial.println("[SM] Remote Unlock Request processed");
+            Diagnostics::logEvent("SM: Remote Unlock Request processed");
             _session.startTime = millis();
             _session.uidLength = 0; // Remote unlock might have no UID
             _session.active = true;
@@ -200,7 +201,7 @@ void StateMachine::update() {
 
                 _doorLock.lock();
                 transitionTo(SystemState::LOCKED);
-                Serial.println("[SESSION] Session timeout reached. Locking door.");
+                Diagnostics::logEvent("SESSION: Timeout reached. Locking door.");
             }
         }
     }

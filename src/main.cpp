@@ -25,6 +25,7 @@
 #include "services/network/command_handler.h"
 #include "services/system/heartbeat_service.h"
 #include "system/state_machine.h"
+#include "system/diagnostics.h"
 
 // --- FreeRTOS Globals ---
 SemaphoreHandle_t xMutex_SPIBus = NULL;
@@ -108,24 +109,19 @@ void vTaskRFID(void *pvParameters) {
         }
 
         if (cardRead) {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) {
-                Serial.print("Card detected UID: ");
-                for (int i = 0; i < uidLength; i++) {
-                    Serial.print(uid[i], HEX);
-                    Serial.print(" ");
-                }
-                Serial.println();
-                xSemaphoreGive(xMutex_Serial);
+            String uidStr = "UID: ";
+            for (int i = 0; i < uidLength; i++) {
+                uidStr += String(uid[i], HEX) + " ";
             }
 
             if (accessControl.isAuthorized(uid, uidLength)) {
-                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[AUTH] ACCESS GRANTED"); xSemaphoreGive(xMutex_Serial); }
+                Diagnostics::logEvent("ACCESS GRANTED - " + uidStr);
                 if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
                     stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED, uid, uidLength);
                     xSemaphoreGive(xMutex_StateMachine);
                 }
             } else {
-                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[AUTH] ACCESS DENIED"); xSemaphoreGive(xMutex_Serial); }
+                Diagnostics::logEvent("ACCESS DENIED - " + uidStr);
             }
         }
         vTaskDelay(100 / portTICK_PERIOD_MS); // Poll RFID at 10Hz
@@ -141,6 +137,15 @@ void vTaskLogging(void *pvParameters) {
             xSemaphoreGive(xMutex_SPIBus);
         }
         vTaskDelay(500 / portTICK_PERIOD_MS); // Background logging checks at 2Hz
+    }
+}
+
+void vTaskDiagnostics(void *pvParameters) {
+    for (;;) {
+#if ENABLE_DIAGNOSTICS_DASHBOARD
+        Diagnostics::updateTable();
+#endif
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -162,13 +167,13 @@ void vTaskCoreLogic(void *pvParameters) {
         }
 
         if (presenceService.justBecameOccupied()) {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[PRESENCE] Room became occupied"); xSemaphoreGive(xMutex_Serial); }
+            Diagnostics::logEvent("PRESENCE: Room became occupied");
         }
         if (presenceService.justBecameEmpty()) {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[PRESENCE] Room became empty"); xSemaphoreGive(xMutex_Serial); }
+            Diagnostics::logEvent("PRESENCE: Room became empty");
         }
         if (lightService.isDark()) {
-            if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[LIGHT] Room is dark"); xSemaphoreGive(xMutex_Serial); }
+            // Can be noisy, omitted or log specific changes
         }
 
         // ---- Simulated Input Handler (from Queue) ----
@@ -177,13 +182,13 @@ void vTaskCoreLogic(void *pvParameters) {
             if (c == 'c') {
                 rfid.simulateCardDetected();
             } else if (c == 'u') {
-                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[EVENT] Session Start Requested"); xSemaphoreGive(xMutex_Serial); }
+                Diagnostics::logEvent("SIM: Session Start Requested");
                 if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
                     stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
                     xSemaphoreGive(xMutex_StateMachine);
                 }
             } else if (c == 'm') {
-                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[SIM] Simulating MQTT 'unlock' command"); xSemaphoreGive(xMutex_Serial); }
+                Diagnostics::logEvent("SIM: MQTT unlock command");
                 if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
                     commandHandler.handleCommand("unlock");
                     xSemaphoreGive(xMutex_StateMachine);
@@ -199,12 +204,13 @@ void vTaskCoreLogic(void *pvParameters) {
 void setup() {
     Serial.begin(115200);
     delay(100);
-    Serial.println("[BOOT] Smart Classroom Node Starting...");
+    Diagnostics::init();
+    Diagnostics::logEvent("Smart Classroom Node Starting...");
 
     if (!rfid.init()) {
-        Serial.println("[ERROR] PN532 initialization failed");
+        Diagnostics::setRFIDStatus("INIT FAILED");
     } else {
-        Serial.println("[INFO] PN532 RFID reader initialized");
+        Diagnostics::setRFIDStatus("READY");
     }
 
     doorLock.begin();
@@ -236,11 +242,11 @@ void setup() {
     xTaskCreatePinnedToCore(vTaskRFID, "RFIDTask", 4096, NULL, 3, NULL, 1);
     xTaskCreatePinnedToCore(vTaskLogging, "LoggingTask", 6144, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(vTaskCoreLogic, "CoreLogic", 8192, NULL, 2, NULL, 1);
+#if ENABLE_DIAGNOSTICS_DASHBOARD
+    xTaskCreatePinnedToCore(vTaskDiagnostics, "Diagnostics", 4096, NULL, 1, NULL, 1);
+#endif
 
-    if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) {
-        Serial.println("[INFO] Type 'u' to request unlock");
-        xSemaphoreGive(xMutex_Serial);
-    }
+    Diagnostics::logEvent("System fully booted. Waiting for events.");
 }
 
 void loop() {

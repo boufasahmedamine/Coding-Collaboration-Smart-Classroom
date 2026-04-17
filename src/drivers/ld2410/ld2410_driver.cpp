@@ -1,5 +1,5 @@
-#include "drivers/ld2410/ld2410_driver.h"
 #include <Arduino.h>
+#include "system/diagnostics.h"
 
 extern SemaphoreHandle_t xMutex_Serial;
 
@@ -22,10 +22,12 @@ void LD2410Driver::begin()
     delay(500);
 
     if (_radar.begin(Serial2)) {
-        Serial.println("[LD2410] HARDWARE DRIVER INITIALIZED");
+        Diagnostics::logEvent("LD2410 HW DRIVER INTIALIZED");
+        Diagnostics::setRadarStatus("READY");
         _initialized = true;
     } else {
-        Serial.println("[LD2410] HARDWARE NOT FOUND. Check wiring.");
+        Diagnostics::logEvent("LD2410 HARDWARE NOT FOUND");
+        Diagnostics::setRadarStatus("ERROR");
         // We do not freeze so simulation can still run
     }
 }
@@ -42,14 +44,15 @@ void LD2410Driver::update()
             {
                 xQueueReceive(_simQueue, &command, 0);
                 _presence = true;
-                // Note: Serial access assumes mutex where needed or wrapped externally
-                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[LD2410] Simulated Presence ON"); xSemaphoreGive(xMutex_Serial); }
+                Diagnostics::logEvent("LD2410 Simulated Presence ON");
+                Diagnostics::setRadarStatus("ACTIVE (SIM)");
             }
             else if (command == 'n')
             {
                 xQueueReceive(_simQueue, &command, 0);
                 _presence = false;
-                if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) { Serial.println("[LD2410] Simulated Presence OFF"); xSemaphoreGive(xMutex_Serial); }
+                Diagnostics::logEvent("LD2410 Simulated Presence OFF");
+                Diagnostics::setRadarStatus("IDLE (SIM)");
             }
         }
     }
@@ -60,6 +63,7 @@ void LD2410Driver::update()
         if (_radar.isConnected()) {
             // Update presence from the real hardware frame
             _presence = _radar.presenceDetected();
+            Diagnostics::setRadarStatus(_presence ? "ACTIVE" : "IDLE");
         }
     }
 }

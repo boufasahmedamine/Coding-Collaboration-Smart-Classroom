@@ -1,5 +1,6 @@
 #include "drivers/doorlock/doorlock_driver.h"
 #include <Arduino.h>
+#include "system/diagnostics.h"
 
 DoorLockDriver::DoorLockDriver(int pin)
     : _pin(pin), _locked(true)
@@ -12,7 +13,7 @@ void DoorLockDriver::begin()
 
     lock(); // Default to locked state for safety
 
-    Serial.println("[LOCK] Door lock driver initialized");
+    Diagnostics::logEvent("DOOR LOCK DRIVER INITIALIZED");
 }
 
 void DoorLockDriver::lock()
@@ -20,7 +21,8 @@ void DoorLockDriver::lock()
     digitalWrite(_pin, HIGH);
     _locked = true;
 
-    Serial.println("[LOCK] Door locked");
+    Diagnostics::setDoorStatus("LOCKED");
+    Diagnostics::logEvent("Door locked");
 }
 
 void DoorLockDriver::unlock()
@@ -28,7 +30,8 @@ void DoorLockDriver::unlock()
     digitalWrite(_pin, LOW);
     _locked = false;
 
-    Serial.println("[LOCK] Door unlocked");
+    Diagnostics::setDoorStatus("UNLOCKED");
+    Diagnostics::logEvent("Door unlocked");
 }
 
 bool DoorLockDriver::isLocked()
