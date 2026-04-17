@@ -1,3 +1,4 @@
+#include "drivers/ld2410/ld2410_driver.h"
 #include <Arduino.h>
 #include "system/diagnostics.h"
 
