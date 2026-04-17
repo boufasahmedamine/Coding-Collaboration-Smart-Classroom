@@ -228,6 +228,8 @@ void setup() {
     
     stateMachine.init();
     sdLogger.begin();
+    wifiManager.begin();
+    mqttManager.begin();
 
     // --- FreeRTOS Initialization ---
     xMutex_SPIBus = xSemaphoreCreateMutex();

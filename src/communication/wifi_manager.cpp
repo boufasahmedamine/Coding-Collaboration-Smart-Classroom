@@ -11,6 +11,7 @@ void WiFiManager::begin()
 {
     Serial.println("[WIFI] Connecting...");
 
+    WiFi.mode(WIFI_STA); // Crucial to prevent starting an unintended AP and clean up state
     WiFi.begin(_ssid, _password);
 }
 

@@ -1,6 +1,7 @@
 #include "communication/mqtt_manager.h"
 #include "services/network/command_handler.h"
 #include <Arduino.h>
+#include <WiFi.h>
 
 MQTTManager::MQTTManager(const char* broker, int port)
     : _broker(broker),
@@ -20,6 +21,11 @@ void MQTTManager::begin()
 
 void MQTTManager::update()
 {
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        return; // Do not attempt to use TCP/IP if WiFi is down
+    }
+
     if (!_client.connected())
     {
         reconnect();
