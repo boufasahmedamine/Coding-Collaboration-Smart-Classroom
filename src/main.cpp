@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <SPI.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
@@ -41,13 +42,13 @@ DoorLockDriver doorLock(PIN_DOOR_LOCK);
 
 WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
-SDLogger sdLogger(5);
+SDLogger sdLogger(PIN_SD_CS);
 LogManager logManager(&mqttManager, &sdLogger);
 StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
 AttendanceManager attendanceManager(&logManager, &stateMachine);
-PN532Driver rfid;
-LD2410Driver presenceSensor(16, 17);
-LDRDriver lightSensor(34); // using pin 34 for analog input
+PN532Driver rfid(PIN_PN532_CS);
+LD2410Driver presenceSensor(PIN_RADAR_RX, PIN_RADAR_TX);
+LDRDriver lightSensor(PIN_LDR);
 PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
 AutomationController automationController(&presenceService, &lightService);
@@ -204,6 +205,10 @@ void vTaskCoreLogic(void *pvParameters) {
 void setup() {
     Serial.begin(115200);
     delay(100);
+
+    // Initialize global SPI Bus
+    SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
+
     Diagnostics::init();
     Diagnostics::logEvent("Smart Classroom Node Starting...");
 

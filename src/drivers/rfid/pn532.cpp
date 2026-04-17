@@ -35,7 +35,7 @@ bool PN532Driver::readCard(uint8_t* uidBuffer, uint8_t* uidLength) {
 
     // 1. Process Simulation
     if (_simulateCard) {
-        uint8_t simulatedUID[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+        uint8_t simulatedUID[4] = {0x04, 0x5F, 0x32, 0x1A}; // Teacher 1
         memcpy(uidBuffer, simulatedUID, 4);
         *uidLength = 4;
         Diagnostics::logEvent("SIMULATED CARD DETECTED");

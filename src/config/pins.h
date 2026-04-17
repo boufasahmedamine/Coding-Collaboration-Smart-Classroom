@@ -1,13 +1,31 @@
 #ifndef PINS_H
 #define PINS_H
 
-#define PIN_DOOR_LOCK  25  // example GPIO
+// --- SPI BUS ---
+// Standard VSPI pins for ESP32
+#define PIN_SPI_SCK    18
+#define PIN_SPI_MISO   19
+#define PIN_SPI_MOSI   23
+
+// --- CHIP SELECTS ---
+// Must be unique to prevent bus collisions! 
+#define PIN_SD_CS      5    // Default for many ESP32 SD shields
+#define PIN_PN532_CS   22   // Dedicated CS for RFID
+
+// --- UART SENSORS ---
+// LD2410 Radar (Using Hardware Serial2)
+#define PIN_RADAR_RX   16
+#define PIN_RADAR_TX   17
+
+// --- ANALOG SENSORS ---
+// Photoresistor
+#define PIN_LDR        34
+
+// --- RELAYS & ACTUATORS ---
+#define PIN_DOOR_LOCK  25
 #define DOOR_ACTIVE_HIGH true
 
-#define PN532_SDA 21
-#define PN532_SCL 22
-
-#define PIN_LIGHTING   26  // example GPIO
-#define PIN_PROJECTOR  27  // example GPIO
+#define PIN_LIGHTING   26
+#define PIN_PROJECTOR  27
 
 #endif
