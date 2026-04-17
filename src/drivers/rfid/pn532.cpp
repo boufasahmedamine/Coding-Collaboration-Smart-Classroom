@@ -14,14 +14,15 @@ bool PN532Driver::init() {
     uint32_t versiondata = _nfc->getFirmwareVersion();
     if (!versiondata) {
         Diagnostics::logEvent("PN532 HARDWARE NOT FOUND");
+        Diagnostics::setRFIDStatus("HW NOT FOUND");
         // Still returning true so simulation commands can work, but mark hardware as detached.
-        // In a strict production system, we might return false here.
         _initialized = false;
         return true; 
     }
 
     _nfc->SAMConfig();
     Diagnostics::logEvent("PN532 DRIVER INITIALIZED");
+    Diagnostics::setRFIDStatus("READY");
 
     _initialized = true;
     return true;

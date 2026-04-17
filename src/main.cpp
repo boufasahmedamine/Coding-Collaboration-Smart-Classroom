@@ -212,11 +212,7 @@ void setup() {
     Diagnostics::init();
     Diagnostics::logEvent("Smart Classroom Node Starting...");
 
-    if (!rfid.init()) {
-        Diagnostics::setRFIDStatus("INIT FAILED");
-    } else {
-        Diagnostics::setRFIDStatus("READY");
-    }
+    rfid.init();
 
     doorLock.begin();
     lightingDriver.begin();
