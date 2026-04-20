@@ -7,6 +7,7 @@
 static const char* stateToString(StateMachine::SystemState state) {
     switch (state) {
         case StateMachine::SystemState::LOCKED: return "LOCKED";
+        case StateMachine::SystemState::WAITING_FOR_AUTH: return "WAITING_FOR_AUTH";
         case StateMachine::SystemState::UNLOCKED: return "UNLOCKED";
         default: return "UNKNOWN";
     }
@@ -78,6 +79,24 @@ void StateMachine::handleEvent(SystemEvent event, const uint8_t* uid, uint8_t ui
             handleLockedState(event, uid, uidLength);
             break;
 
+        case SystemState::WAITING_FOR_AUTH:
+            // Forward events to a new handler for the waiting state
+            switch (event) {
+                case SystemEvent::ACCESS_GRANTED:
+                    _session.startTime = millis();
+                    _session.active = true;
+                    // UID should have been stored already or passed here
+                    transitionTo(SystemState::UNLOCKED);
+                    break;
+                case SystemEvent::ACCESS_DENIED:
+                    transitionTo(SystemState::LOCKED);
+                    Diagnostics::logEvent("SM: Access Denied by Server");
+                    break;
+                default:
+                    break;
+            }
+            break;
+
         case SystemState::UNLOCKED:
             handleSessionActiveState(event);
             break;
@@ -91,16 +110,22 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
 
     switch (event) {
 
+        case SystemEvent::RFID_READ:
+            if (uid != nullptr && uidLength > 0) {
+                _session.uidLength = uidLength;
+                memcpy(_session.uid, uid, uidLength);
+            }
+            transitionTo(SystemState::WAITING_FOR_AUTH);
+            break;
+
         case SystemEvent::ACCESS_GRANTED:
-                                    _session.startTime = millis();
-                                    _session.active = true;
-                                   if (uid != nullptr && uidLength > 0) {
-                                   _session.uidLength = uidLength;
-
-                                   memcpy(_session.uid, uid, uidLength);
-                             }
-
-               transitionTo(SystemState::UNLOCKED);
+            _session.startTime = millis();
+            _session.active = true;
+            if (uid != nullptr && uidLength > 0) {
+                _session.uidLength = uidLength;
+                memcpy(_session.uid, uid, uidLength);
+            }
+            transitionTo(SystemState::UNLOCKED);
             break;
 
         case SystemEvent::UNLOCK_REQUEST:

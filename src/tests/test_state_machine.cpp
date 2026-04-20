@@ -12,30 +12,50 @@ void runStateMachineTest() {
     if (!initialized) {
         Serial.begin(115200);
         stateMachine.init();
-        Serial.println("StateMachine Test Ready");
-        Serial.println("Type 'u' to unlock");
+        Serial.println("--- StateMachine Verification Test ---");
+        Serial.println("Commands:");
+        Serial.println("  'r' : Simulate RFID card read (-> WAITING_FOR_AUTH)");
+        Serial.println("  'g' : Simulate Access Granted by Server (-> UNLOCKED)");
+        Serial.println("  'd' : Simulate Access Denied by Server (-> LOCKED)");
+        Serial.println("  'u' : Quick unlock (direct grant)");
         initialized = true;
     }
 
     if (Serial.available()) {
         char c = Serial.read();
 
-        if (c == 'u') {
-            Serial.println("Unlock session requested");
-            stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+        switch (c) {
+            case 'r':
+                Serial.println("Event: RFID_READ");
+                stateMachine.handleEvent(StateMachine::SystemEvent::RFID_READ);
+                break;
+            case 'g':
+                Serial.println("Event: ACCESS_GRANTED");
+                stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+                break;
+            case 'd':
+                Serial.println("Event: ACCESS_DENIED");
+                stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_DENIED);
+                break;
+            case 'u':
+                Serial.println("Event: UNLOCK_REQUEST (Grant)");
+                stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
+                break;
         }
     }
 
     stateMachine.update();
 
-    // Optional debug print
     static unsigned long lastPrint = 0;
     if (millis() - lastPrint > 1000) {
         lastPrint = millis();
-
-        if (stateMachine.getState() == StateMachine::SystemState::LOCKED)
-            Serial.println("State: LOCKED");
-        else
-            Serial.println("State: UNLOCKED");
+        
+        Serial.print("Current State: ");
+        switch(stateMachine.getState()) {
+            case StateMachine::SystemState::LOCKED:           Serial.println("LOCKED"); break;
+            case StateMachine::SystemState::WAITING_FOR_AUTH: Serial.println("WAITING_FOR_AUTH"); break;
+            case StateMachine::SystemState::UNLOCKED:         Serial.println("UNLOCKED"); break;
+            default:                                          Serial.println("UNKNOWN"); break;
+        }
     }
 }

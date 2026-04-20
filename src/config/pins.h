@@ -9,13 +9,12 @@
 
 // --- CHIP SELECTS ---
 // Must be unique to prevent bus collisions! 
-#define PIN_SD_CS      5    // Default for many ESP32 SD shields
 #define PIN_PN532_CS   22   // Dedicated CS for RFID
+// PIN_SD_CS (5) is reclaimed
 
-// --- UART SENSORS ---
-// LD2410 Radar (Using Hardware Serial2)
-#define PIN_RADAR_RX   16
-#define PIN_RADAR_TX   17
+// --- DIGITAL SENSORS ---
+#define PIN_PIR        16   // Reclaimed from Radar RX
+// PIN_RADAR_TX (17) is reclaimed
 
 // --- ANALOG SENSORS ---
 // Photoresistor

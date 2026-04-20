@@ -6,17 +6,14 @@
 #include <freertos/queue.h>
 #include "config/pins.h"
 #include "drivers/doorlock/doorlock_driver.h"
-#include "drivers/rfid/pn532.h"
-#include "drivers/ld2410/ld2410_driver.h"
+#include "drivers/pir/pir_driver.h"
 #include "drivers/ldr/ldr_driver.h"
-#include "services/auth/access_control.h"
+#include "services/auth/auth_proxy.h"
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
-#include "services/logging/sd_logger.h"
 #include "services/automation/presence_service.h"
 #include "services/automation/light_service.h"
 #include "services/automation/automation_controller.h"
-#include "services/automation/occupancy_logic.h"
 #include "services/automation/lighting_logic.h"
 #include "services/automation/projector_logic.h"
 #include "drivers/actuators/lighting.h"
@@ -24,9 +21,11 @@
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_manager.h"
 #include "services/network/command_handler.h"
+#include "services/network/time_service.h"
 #include "services/system/heartbeat_service.h"
 #include "system/state_machine.h"
 #include "system/diagnostics.h"
+#include "drivers/rfid/pn532.h"
 
 // --- FreeRTOS Globals ---
 SemaphoreHandle_t xMutex_SPIBus = NULL;
@@ -34,7 +33,6 @@ SemaphoreHandle_t xMutex_Serial = NULL;
 SemaphoreHandle_t xMutex_StateMachine = NULL;
 SemaphoreHandle_t xMutex_MQTT = NULL;
 
-QueueHandle_t xQueue_SimCommand_LD2410 = NULL;
 QueueHandle_t xQueue_SimCommand_Main = NULL;
 // ------------------------
 
@@ -42,27 +40,26 @@ DoorLockDriver doorLock(PIN_DOOR_LOCK);
 
 WiFiManager wifiManager("SSID", "PASSWORD");
 MQTTManager mqttManager("192.168.1.100", 1883);
-SDLogger sdLogger(PIN_SD_CS);
-LogManager logManager(&mqttManager, &sdLogger);
+LogManager logManager(&mqttManager);
 StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
 AttendanceManager attendanceManager(&logManager, &stateMachine);
 PN532Driver rfid(PIN_PN532_CS);
-LD2410Driver presenceSensor(PIN_RADAR_RX, PIN_RADAR_TX);
+PIRDriver presenceSensor(PIN_PIR);
 LDRDriver lightSensor(PIN_LDR);
 PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
 AutomationController automationController(&presenceService, &lightService);
+TimeService timeService;
+AuthProxy authProxy(&mqttManager);
 
 Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
 
-OccupancyLogic occupancy(presenceSensor);
-LightingLogic lightingLogic(lightingDriver, occupancy, lightSensor);
-ProjectorLogic projectorLogic(projectorDriver, stateMachine, occupancy);
+LightingLogic lightingLogic(lightingDriver, presenceService, lightSensor);
+ProjectorLogic projectorLogic(projectorDriver, stateMachine, presenceService);
 
 HeartbeatService heartbeat(&mqttManager);
-CommandHandler commandHandler(&stateMachine);
-AccessControl accessControl;
+CommandHandler commandHandler(&stateMachine, &timeService);
 
 // --- FreeRTOS Tasks ---
 void vTaskNetwork(void *pvParameters) {
@@ -90,9 +87,7 @@ void vTaskSerialRouter(void *pvParameters) {
         }
 
         if (c != '\0') {
-            if (c == 'p' || c == 'n') {
-                xQueueSend(xQueue_SimCommand_LD2410, &c, 0);
-            } else if (c == 'c' || c == 'u' || c == 'm') {
+             if (c == 'c' || c == 'u' || c == 'm') {
                 xQueueSend(xQueue_SimCommand_Main, &c, 0);
             }
         }
@@ -110,34 +105,31 @@ void vTaskRFID(void *pvParameters) {
         }
 
         if (cardRead) {
-            String uidStr = "UID: ";
+            String uidStr = "UID:";
             for (int i = 0; i < uidLength; i++) {
-                uidStr += String(uid[i], HEX) + " ";
+                uidStr += String(uid[i], HEX);
             }
 
-            if (accessControl.isAuthorized(uid, uidLength)) {
-                Diagnostics::logEvent("ACCESS GRANTED - " + uidStr);
-                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                    stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED, uid, uidLength);
-                    xSemaphoreGive(xMutex_StateMachine);
-                }
-            } else {
-                Diagnostics::logEvent("ACCESS DENIED - " + uidStr);
+            Diagnostics::logEvent("RFID: Detected " + uidStr);
+            
+            // Request Authorization from Server
+            authProxy.requestAuthorization(uid, uidLength);
+
+            if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                stateMachine.handleEvent(StateMachine::SystemEvent::RFID_READ, uid, uidLength);
+                xSemaphoreGive(xMutex_StateMachine);
             }
         }
         vTaskDelay(100 / portTICK_PERIOD_MS); // Poll RFID at 10Hz
     }
 }
 
-void vTaskLogging(void *pvParameters) {
+void vTaskStatus(void *pvParameters) {
     for (;;) {
-        // Attendance Manager uses LogManager, which uses SDLogger (SPI).
-        // Wrapping in SPI Mutex ensures we don't collide with the RFID SPI transaction.
-        if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
-            attendanceManager.update();
-            xSemaphoreGive(xMutex_SPIBus);
-        }
-        vTaskDelay(500 / portTICK_PERIOD_MS); // Background logging checks at 2Hz
+        // Attendance Manager updates session logs based on state machine
+        attendanceManager.update();
+        
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Status updates at 1Hz
     }
 }
 
@@ -157,7 +149,6 @@ void vTaskCoreLogic(void *pvParameters) {
         presenceService.update();
         lightService.update();
         automationController.update();
-        occupancy.update();
         lightingLogic.update();
         projectorLogic.update();
         
@@ -217,15 +208,17 @@ void setup() {
     doorLock.begin();
     lightingDriver.begin();
     projectorDriver.begin();
+    presenceSensor.begin();
+    lightSensor.begin();
     
     // Safety: ensure actuators are off
     lightingDriver.turnOff();
     projectorDriver.turnOff();
     
     stateMachine.init();
-    sdLogger.begin();
     wifiManager.begin();
     mqttManager.begin();
+    mqttManager.setCommandHandler(&commandHandler);
 
     // --- FreeRTOS Initialization ---
     xMutex_SPIBus = xSemaphoreCreateMutex();
@@ -233,23 +226,20 @@ void setup() {
     xMutex_StateMachine = xSemaphoreCreateMutex();
     xMutex_MQTT = xSemaphoreCreateMutex();
 
-    xQueue_SimCommand_LD2410 = xQueueCreate(10, sizeof(char));
     xQueue_SimCommand_Main = xQueueCreate(10, sizeof(char));
-
-    presenceSensor.setSimQueue(xQueue_SimCommand_LD2410);
 
     xTaskCreatePinnedToCore(vTaskNetwork, "NetworkTask", 8192, NULL, 2, NULL, 0);
     xTaskCreatePinnedToCore(vTaskSerialRouter, "SerialRouter", 2048, NULL, 1, NULL, 0);
 
     // Core 1 Tasks (Application Logic + Sensors)
     xTaskCreatePinnedToCore(vTaskRFID, "RFIDTask", 4096, NULL, 3, NULL, 1);
-    xTaskCreatePinnedToCore(vTaskLogging, "LoggingTask", 6144, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(vTaskStatus, "StatusTask", 6144, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(vTaskCoreLogic, "CoreLogic", 8192, NULL, 2, NULL, 1);
 #if ENABLE_DIAGNOSTICS_DASHBOARD
     xTaskCreatePinnedToCore(vTaskDiagnostics, "Diagnostics", 4096, NULL, 1, NULL, 1);
 #endif
 
-    Diagnostics::logEvent("System fully booted. Waiting for events.");
+    Diagnostics::logEvent("System fully booted. waiting for events.");
 }
 
 void loop() {

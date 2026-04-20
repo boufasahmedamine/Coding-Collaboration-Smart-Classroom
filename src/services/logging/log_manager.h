@@ -3,19 +3,17 @@
 
 #include <stdint.h>
 #include "system/session_record.h"
-#include "services/logging/sd_logger.h"
 #include "communication/mqtt_manager.h"
 
 class LogManager {
 public:
-    LogManager(MQTTManager* mqtt, SDLogger* sd);
+    LogManager(MQTTManager* mqtt);
 
     void logSessionStart(const SessionRecord& session);
     void logSessionEnd(const SessionRecord& session);
     
 private:
     MQTTManager* _mqtt;
-    SDLogger* _sd;
 
     String formatSessionStart(const SessionRecord& session);
     String formatSessionEnd(const SessionRecord& session);

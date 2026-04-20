@@ -10,16 +10,19 @@ class AttendanceManager;
 class StateMachine {
 public:
     enum class SystemEvent {
+    RFID_READ,
     ACCESS_GRANTED,
+    ACCESS_DENIED,
     PRESENCE_DETECTED,
     PRESENCE_LOST,
     OVERRIDE_ON,
     OVERRIDE_OFF,
     UNLOCK_REQUEST
 };
-enum class SystemState { // Renamed from State
+enum class SystemState {
     LOCKED,
-    UNLOCKED // Changed from SESSION_ACTIVE
+    WAITING_FOR_AUTH,
+    UNLOCKED
 };
 
     static const unsigned long DEFAULT_SESSION_TIMEOUT_MS = 5400000; // 1.5 hours

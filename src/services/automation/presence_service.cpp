@@ -1,6 +1,6 @@
 #include "services/automation/presence_service.h"
 
-PresenceService::PresenceService(LD2410Driver* driver)
+PresenceService::PresenceService(PIRDriver* driver)
     : _driver(driver),
       _occupied(false),
       _previousState(false)
@@ -11,7 +11,9 @@ void PresenceService::update()
 {
     _previousState = _occupied;
 
-    _occupied = _driver->isPresenceDetected();
+    if (_driver) {
+        _occupied = _driver->isMotionDetected();
+    }
 }
 
 bool PresenceService::isOccupied()

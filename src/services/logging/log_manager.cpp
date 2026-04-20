@@ -1,9 +1,8 @@
 #include "services/logging/log_manager.h"
 #include <Arduino.h>
 
-LogManager::LogManager(MQTTManager* mqtt, SDLogger* sd)
-    : _mqtt(mqtt),
-      _sd(sd)
+LogManager::LogManager(MQTTManager* mqtt)
+    : _mqtt(mqtt)
 {
 }
 
@@ -16,11 +15,6 @@ void LogManager::logSessionStart(const SessionRecord& session)
     {
         _mqtt->publish("classroom/attendance/start", logMsg.c_str());
     }
-
-    if (_sd)
-    {
-        _sd->log(logMsg.c_str());
-    }
 }
 
 void LogManager::logSessionEnd(const SessionRecord& session)
@@ -31,11 +25,6 @@ void LogManager::logSessionEnd(const SessionRecord& session)
     if (_mqtt && _mqtt->isConnected())
     {
         _mqtt->publish("classroom/attendance/end", logMsg.c_str());
-    }
-
-    if (_sd)
-    {
-        _sd->log(logMsg.c_str());
     }
 }
 

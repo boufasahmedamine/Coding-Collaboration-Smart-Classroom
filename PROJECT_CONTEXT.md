@@ -1,13 +1,13 @@
 # ZARZARA Smart Classroom - Firmware Context
 
 ## Project Overview
-Firmware for ESP32-WROOM-32U node handling RFID Access, mmWave Presence (LD2410), Lux Sensing (simple LDRs), IR Control, and MQTT Comm.
+Firmware for ESP32-WROOM-32U node handling RFID Access (Server-side Auth), PIR Presence, Lux Sensing (simple LDRs), IR Control, and MQTT Comm.
 
 ## Architecture Laws (Strict Enforcement)
 This project follows a **Strict Layered Architecture**. Do not allow cross-layer contamination.
 1. **HAL**: Hardware abstraction only. Wraps ESP32 SDK. No logic.
-2. **Drivers**: Device-specific (PN532, LD2410, etc.). No business rules or auth decisions.
-3. **Services**: Business logic (Auth, Automation). Never access GPIO/I2C/SPI directly.
+2. **Drivers**: Device-specific (PN532, PIR, etc.). No business rules or auth decisions.
+3. **Services**: Business logic (Auth Proxy, Automation). Never access GPIO/I2C/SPI directly.
 4. **Communication**: WiFi/MQTT only. No actuator control.
 5. **System**: Scheduler and State Machine. Orchestrates services.
 6. **Main**: Initialization and task registration only. No logic.
@@ -21,22 +21,22 @@ This project follows a **Strict Layered Architecture**. Do not allow cross-layer
 
 ## Hardware Mapping
 - **MCU:** ESP32-WROOM-32U
-- **Inputs:** 2x PN532 (SPI), LD2410 (UART), LDRs (Analog), DS3231 (I2C), Reed Switch, Exit Button.
+- **Inputs:** 2x PN532 (SPI), PIR Sensor (Digital), LDRs (Analog), Reed Switch, Exit Button.
 - **Outputs:** Maglock (MOSFET), SSR (Lighting), IR LED (Transistor), Buzzers, RGB LEDs.
-- **Storage:** MicroSD (SPI).
+- **Time Source:** Synchronized via MQTT from Central Server.
 
 ## Directory Structure
 Follow this structure for all new files:
 - `src/config/`: Pins and thresholds.
 - `src/hal/`: Bus abstractions (I2C, SPI, UART).
 - `src/drivers/`: Device-specific classes (rfid, sensors, actuators).
-- `src/services/`: Logic (auth, attendance, automation, logging).
+- `src/services/`: Logic (auth proxy, attendance, automation, logging).
 - `src/communication/`: Networking stack.
 - `src/system/`: Task scheduler and global state machine.
 - `tests/`: Hardware simulation and unit tests.
 
 ## State Machine States
-- `BOOT`, `IDLE`, `OCCUPIED`, `ACCESS_GRANTED`, `ERROR`, `OFFLINE`.
+- `BOOT`, `IDLE`, `OCCUPIED`, `WAITING_FOR_AUTH`, `ACCESS_GRANTED`, `ERROR`, `OFFLINE`.
 
 
 ZARZARA Smart Classroom – Firmware AI Context
@@ -45,11 +45,11 @@ Firmware for a Smart Classroom Node built on ESP32-WROOM-32U.
 
 Main capabilities:
 
-RFID access control (PN532)
+RFID UID transmission to server (PN532)
 
-Attendance tracking
+Attendance tracking (Server-coordinated)
 
-Presence detection (LD2410 mmWave)
+Presence detection (PIR Sensor)
 
 Ambient light sensing (LDRs)
 
@@ -60,8 +60,6 @@ Lighting automation
 Projector IR control
 
 WiFi + MQTT communication
-
-Optional RTC (DS3231) and MicroSD logging
 
 The firmware must remain modular, safe, and maintainable.
 
@@ -111,7 +109,7 @@ drivers
 
 control specific devices
 
-examples: PN532, LD2410, LDRs
+examples: PN532, PIR, LDRs
 
 may call HAL
 
@@ -121,11 +119,11 @@ services
 
 application logic
 
-authentication
+authentication proxy (MQTT based)
 
 automation
 
-attendance
+attendance relay
 
 NEVER access hardware directly
 
@@ -204,7 +202,7 @@ door lock → LOCKED
 lighting → OFF
 projector IR → OFF
 
-Never unlock a door before authentication is confirmed.
+Never unlock a door before authentication is confirmed by the server.
 
 On system failure:
 
@@ -235,9 +233,8 @@ ESP32-WROOM-32U
 Inputs
 
 2× PN532 RFID (SPI)
-LD2410 presence radar (UART)
+PIR presence sensor (Digital)
 LDRs (Analog)
-DS3231 RTC (I2C)
 Reed switch
 Exit push button
 
@@ -249,9 +246,6 @@ IR LED via transistor
 Buzzers
 RGB LEDs
 
-Storage
-
-MicroSD (SPI)
 Repository Structure
 src/
 
@@ -267,18 +261,16 @@ hal/
 
 drivers/
     rfid/pn532.*
-    sensors/ld2410.*
+    sensors/pir.*
     sensors/LDR.*
-    storage/sdcard.*
-    storage/rtc_ds3231.*
     actuators/door_lock.*
     actuators/lighting.*
     actuators/ir_projector.*
 
 services/
-    auth/access_control.*
+    auth/auth_proxy.*
     attendance/attendance_manager.*
-    automation/occupancy_logic.*
+    automation/presence_service.*
     automation/lighting_logic.*
     automation/projector_logic.*
     logging/log_manager.*
@@ -303,29 +295,36 @@ Data Flow Examples
 RFID Access
 PN532 Driver
    ↓
-AccessControl Service
+AuthProxy Service
+   ↓
+MQTT (Publish UID)
+   ↓
+Server (Validate)
+   ↓
+MQTT (Receive Unlock Command)
+   ↓
+CommandHandler
    ↓
 StateMachine
    ↓
 DoorLock Driver
+
 Occupancy Automation
-LD2410 Driver
+PIR Driver
    ↓
-OccupancyLogic Service
+Presence Service
    ↓
 LightingLogic Service
    ↓
 Lighting Driver
+
 Attendance Logging
-RFID Driver
+Server detection of session
    ↓
-AttendanceManager
-   ↓
-LogManager
-   ↓
-SD Card Driver
+LogManager (Status updates)
    ↓
 MQTT publish
+
 State Machine
 
 System states:
@@ -333,6 +332,7 @@ System states:
 BOOT
 IDLE
 OCCUPIED
+WAITING_FOR_AUTH
 ACCESS_GRANTED
 ERROR
 OFFLINE
@@ -360,15 +360,15 @@ Service Template
 
 Example service structure:
 
-class AccessControl {
+class AuthProxy {
 public:
-    bool authenticate(const uint8_t* uid, uint8_t length);
+    void sendAuthRequest(const uint8_t* uid, uint8_t length);
 
 private:
-    DoorLock& doorLock;
+    MQTTClient& mqtt;
 };
 
-Services combine multiple drivers.
+Services combine multiple drivers or relay to communication.
 
 Important Principle
 
@@ -378,7 +378,7 @@ Never bypass layers.
 
 Example of correct flow:
 
-RFID → AccessControl → StateMachine → DoorLock
+RFID → AuthProxy → StateMachine → DoorLock
 
 Incorrect flow:
 

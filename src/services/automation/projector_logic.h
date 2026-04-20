@@ -3,18 +3,18 @@
 
 #include "drivers/actuators/ir_projector.h"
 #include "system/state_machine.h"
-#include "services/automation/occupancy_logic.h"
+#include "services/automation/presence_service.h"
 
 class ProjectorLogic
 {
 public:
-    ProjectorLogic(IRProjector& projector, StateMachine& sm, OccupancyLogic& occupancy);
+    ProjectorLogic(IRProjector& projector, StateMachine& sm, PresenceService& presence);
     void update();
 
 private:
     IRProjector& _projector;
     StateMachine& _stateMachine;
-    OccupancyLogic& _occupancy;
+    PresenceService& _presence;
     bool _lastState;
 };
 
