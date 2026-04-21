@@ -193,8 +193,6 @@ void vTaskCoreLogic(void *pvParameters) {
         if (lightService.isDark()) {
             // Can be noisy, omitted or log specific changes
         }
-
-        }
         
         vTaskDelay(50 / portTICK_PERIOD_MS); // Logic engine runs at 20Hz
     }

@@ -27,8 +27,18 @@ void DashboardService::update(bool force)
 
     if (_sm) {
         SessionRecord& session = _sm->getCurrentSession();
-        doc["teacher_rfid"] = session.active ? session.professorUID : "";
-        doc["new_session"] = false; // Usually true only on first scan of a block
+        if (session.active) {
+            char uidStr[20];
+            String hex = "";
+            for (uint8_t i = 0; i < session.uidLength; i++) {
+                if (session.uid[i] < 0x10) hex += "0";
+                hex += String(session.uid[i], HEX);
+            }
+            doc["teacher_rfid"] = hex;
+        } else {
+            doc["teacher_rfid"] = "";
+        }
+        doc["new_session"] = false; 
     }
 
     String output;

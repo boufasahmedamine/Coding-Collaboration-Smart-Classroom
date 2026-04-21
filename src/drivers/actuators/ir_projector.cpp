@@ -1,7 +1,7 @@
 #include "drivers/actuators/ir_projector.h"
 #include <Arduino.h>
 
-IRProjector::IRProjector(int pin) : _pin(pin) {}
+IRProjector::IRProjector(int pin) : _pin(pin), _isOn(false) {}
 
 void IRProjector::begin()
 {
@@ -12,11 +12,13 @@ void IRProjector::begin()
 void IRProjector::turnOn()
 {
     digitalWrite(_pin, HIGH);
+    _isOn = true;
     Serial.println("[PROJECTOR] ON");
 }
 
 void IRProjector::turnOff()
 {
     digitalWrite(_pin, LOW);
+    _isOn = false;
     Serial.println("[PROJECTOR] OFF");
 }
