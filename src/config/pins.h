@@ -9,8 +9,8 @@
 
 // --- CHIP SELECTS ---
 // Must be unique to prevent bus collisions! 
-#define PIN_PN532_CS   22   // Dedicated CS for RFID
-// PIN_SD_CS (5) is reclaimed
+#define PIN_PN532_OUT_CS  22   // Dedicated CS for Outside RFID (Authorized Entry)
+#define PIN_PN532_IN_CS   5    // Dedicated CS for Inside RFID (Attendance/Control)
 
 // --- DIGITAL SENSORS ---
 #define PIN_PIR        16   // Reclaimed from Radar RX

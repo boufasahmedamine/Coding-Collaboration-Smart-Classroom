@@ -1,5 +1,6 @@
 #include "communication/mqtt_manager.h"
 #include "services/network/command_handler.h"
+#include "config/mqtt_config.h"
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -54,27 +55,26 @@ void MQTTManager::setCommandHandler(CommandHandler* handler)
 
 void MQTTManager::callback(char* topic, byte* payload, unsigned int length)
 {
-    char message[64];
-    unsigned int len = (length < 63) ? length : 63;
+    char message[256]; // Increased buffer for JSON
+    unsigned int len = (length < 255) ? length : 255;
     memcpy(message, payload, len);
     message[len] = '\0';
 
-    Serial.print("[MQTT] Message received on topic [");
-    Serial.print(topic);
-    Serial.print("]: ");
-    Serial.println(message);
-
     if (_commandHandler)
     {
-        _commandHandler->handleCommand(message);
+        _commandHandler->handleCommand(message, topic);
     }
 }
 
 void MQTTManager::reconnect()
 {
-    if (_client.connect("zarzara_node"))
+    if (_client.connect(MQTT_CLIENT_ID))
     {
-        Serial.println("[MQTT] Connected");
-        _client.subscribe("zarzara/node/command");
+        Serial.println("[MQTT] Connected to Broker");
+        
+        // Subscribe to relevant topics per contract
+        _client.subscribe(TOPIC_COMMANDS);
+        _client.subscribe(TOPIC_ACCESS_RESPONSE);
+        _client.subscribe(TOPIC_DELAY_RESPONSE);
     }
 }

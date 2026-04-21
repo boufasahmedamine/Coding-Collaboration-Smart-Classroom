@@ -12,9 +12,11 @@ namespace Diagnostics {
     void updateTable();
     
     void setSystemState(const String& state);
-    void setRFIDStatus(const String& status);
-    void setRadarStatus(const String& status);
+    void setRFIDStatusOut(const String& status);
+    void setRFIDStatusIn(const String& status);
     void setDoorStatus(const String& status);
+    void setDashboardVisible(bool visible);
+    bool isDashboardVisible();
     void setLDRValue(int value);
     void setLightingStatus(const String& status);
     void logEvent(const String& eventStr);

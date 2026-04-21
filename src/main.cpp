@@ -26,6 +26,8 @@
 #include "system/state_machine.h"
 #include "system/diagnostics.h"
 #include "drivers/rfid/pn532.h"
+#include "services/network/dashboard_service.h"
+#include "config/mqtt_config.h"
 
 // --- FreeRTOS Globals ---
 SemaphoreHandle_t xMutex_SPIBus = NULL;
@@ -33,17 +35,17 @@ SemaphoreHandle_t xMutex_Serial = NULL;
 SemaphoreHandle_t xMutex_StateMachine = NULL;
 SemaphoreHandle_t xMutex_MQTT = NULL;
 
-QueueHandle_t xQueue_SimCommand_Main = NULL;
 // ------------------------
 
 DoorLockDriver doorLock(PIN_DOOR_LOCK);
 
 WiFiManager wifiManager("SSID", "PASSWORD");
-MQTTManager mqttManager("192.168.1.100", 1883);
+MQTTManager mqttManager(MQTT_BROKER_IP, MQTT_PORT);
 LogManager logManager(&mqttManager);
 StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
 AttendanceManager attendanceManager(&logManager, &stateMachine);
-PN532Driver rfid(PIN_PN532_CS);
+PN532Driver rfidOutside(PIN_PN532_OUT_CS, "OUTSIDE");
+PN532Driver rfidInside(PIN_PN532_IN_CS, "INSIDE");
 PIRDriver presenceSensor(PIN_PIR);
 LDRDriver lightSensor(PIN_LDR);
 PresenceService presenceService(&presenceSensor);
@@ -59,7 +61,8 @@ LightingLogic lightingLogic(lightingDriver, presenceService, lightSensor);
 ProjectorLogic projectorLogic(projectorDriver, stateMachine, presenceService);
 
 HeartbeatService heartbeat(&mqttManager);
-CommandHandler commandHandler(&stateMachine, &timeService);
+DashboardService dashboardService(&mqttManager, &stateMachine, &presenceService, &lightingDriver, &projectorDriver);
+CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver);
 
 // --- FreeRTOS Tasks ---
 void vTaskNetwork(void *pvParameters) {
@@ -87,8 +90,23 @@ void vTaskSerialRouter(void *pvParameters) {
         }
 
         if (c != '\0') {
-             if (c == 'c' || c == 'u' || c == 'm') {
-                xQueueSend(xQueue_SimCommand_Main, &c, 0);
+            switch (c) {
+                case 'r':
+                    Diagnostics::logEvent("[MAINT] System Rebooting...");
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
+                    ESP.restart();
+                    break;
+                case 'l':
+                    Diagnostics::logEvent("[MAINT] Manual Door Pulse Triggered");
+                    doorLock.unlock(); 
+                    break;
+                case 'v':
+                    Diagnostics::setDashboardVisible(!Diagnostics::isDashboardVisible());
+                    break;
+                case 's':
+                    Diagnostics::logEvent("[MAINT] Forcing State Sync");
+                    dashboardService.update(true); // Force broadcast
+                    break;
             }
         }
         vTaskDelay(50 / portTICK_PERIOD_MS);
@@ -98,38 +116,46 @@ void vTaskRFID(void *pvParameters) {
     uint8_t uid[7];
     uint8_t uidLength;
     for (;;) {
-        bool cardRead = false;
+        // --- 1. Poll Outside Reader (Access Control) ---
+        bool outsideRead = false;
         if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
-            cardRead = rfid.readCard(uid, &uidLength);
+            outsideRead = rfidOutside.readCard(uid, &uidLength);
             xSemaphoreGive(xMutex_SPIBus);
         }
 
-        if (cardRead) {
-            String uidStr = "UID:";
-            for (int i = 0; i < uidLength; i++) {
-                uidStr += String(uid[i], HEX);
-            }
-
-            Diagnostics::logEvent("RFID: Detected " + uidStr);
-            
-            // Request Authorization from Server
+        if (outsideRead) {
+            Diagnostics::logEvent("[RFID] Outside scan detected");
             authProxy.requestAuthorization(uid, uidLength);
-
             if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
                 stateMachine.handleEvent(StateMachine::SystemEvent::RFID_READ, uid, uidLength);
                 xSemaphoreGive(xMutex_StateMachine);
             }
         }
-        vTaskDelay(100 / portTICK_PERIOD_MS); // Poll RFID at 10Hz
+
+        // --- 2. Poll Inside Reader (Attendance / Control) ---
+        bool insideRead = false;
+        vTaskDelay(20 / portTICK_PERIOD_MS); // Brief yield to allow other SPI users
+        if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
+            insideRead = rfidInside.readCard(uid, &uidLength);
+            xSemaphoreGive(xMutex_SPIBus);
+        }
+
+        if (insideRead) {
+            Diagnostics::logEvent("[RFID] Inside scan detected");
+            authProxy.requestAttendance(uid, uidLength);
+            // Inside scans don't usually change the entry state machine but log events
+        }
+
+        vTaskDelay(100 / portTICK_PERIOD_MS); 
     }
 }
 
 void vTaskStatus(void *pvParameters) {
     for (;;) {
-        // Attendance Manager updates session logs based on state machine
         attendanceManager.update();
+        dashboardService.update(); // Synchronous update with status task
         
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Status updates at 1Hz
+        vTaskDelay(1000 / portTICK_PERIOD_MS); 
     }
 }
 
@@ -168,24 +194,6 @@ void vTaskCoreLogic(void *pvParameters) {
             // Can be noisy, omitted or log specific changes
         }
 
-        // ---- Simulated Input Handler (from Queue) ----
-        char c;
-        if (xQueueReceive(xQueue_SimCommand_Main, &c, 0) == pdTRUE) {
-            if (c == 'c') {
-                rfid.simulateCardDetected();
-            } else if (c == 'u') {
-                Diagnostics::logEvent("SIM: Session Start Requested");
-                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                    stateMachine.handleEvent(StateMachine::SystemEvent::ACCESS_GRANTED);
-                    xSemaphoreGive(xMutex_StateMachine);
-                }
-            } else if (c == 'm') {
-                Diagnostics::logEvent("SIM: MQTT unlock command");
-                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                    commandHandler.handleCommand("unlock");
-                    xSemaphoreGive(xMutex_StateMachine);
-                }
-            }
         }
         
         vTaskDelay(50 / portTICK_PERIOD_MS); // Logic engine runs at 20Hz
@@ -203,7 +211,11 @@ void setup() {
     Diagnostics::init();
     Diagnostics::logEvent("Smart Classroom Node Starting...");
 
-    rfid.init();
+    bool outReady = rfidOutside.init();
+    bool inReady = rfidInside.init();
+    
+    Diagnostics::setRFIDStatusOut(outReady ? "READY" : "FAILED");
+    Diagnostics::setRFIDStatusIn(inReady ? "READY" : "FAILED");
 
     doorLock.begin();
     lightingDriver.begin();
@@ -225,8 +237,6 @@ void setup() {
     xMutex_Serial = xSemaphoreCreateMutex();
     xMutex_StateMachine = xSemaphoreCreateMutex();
     xMutex_MQTT = xSemaphoreCreateMutex();
-
-    xQueue_SimCommand_Main = xQueueCreate(10, sizeof(char));
 
     xTaskCreatePinnedToCore(vTaskNetwork, "NetworkTask", 8192, NULL, 2, NULL, 0);
     xTaskCreatePinnedToCore(vTaskSerialRouter, "SerialRouter", 2048, NULL, 1, NULL, 0);

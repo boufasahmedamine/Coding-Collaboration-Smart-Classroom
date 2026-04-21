@@ -7,18 +7,16 @@
 
 class PN532Driver {
 public:
-    PN532Driver(uint8_t csPin = 5);
+    PN532Driver(uint8_t csPin = 5, const char* name = "RFID");
 
     bool init();
 
-    bool readCard(uint8_t* uidBuffer, uint8_t* uidLength);
-
-    void simulateCardDetected();
+    virtual bool readCard(uint8_t* uidBuffer, uint8_t* uidLength);
 
 private:
     uint8_t _csPin;
+    const char* _name;
     bool _initialized;
-    bool _simulateCard;
     Adafruit_PN532* _nfc;
 };
 

@@ -21,9 +21,9 @@ This project follows a **Strict Layered Architecture**. Do not allow cross-layer
 
 ## Hardware Mapping
 - **MCU:** ESP32-WROOM-32U
-- **Inputs:** 2x PN532 (SPI), PIR Sensor (Digital), LDRs (Analog), Reed Switch, Exit Button.
+- **Inputs:** 2x PN532 (SPI - Outside & Inside), PIR Sensor (Digital), LDRs (Analog), Reed Switch, Exit Button.
 - **Outputs:** Maglock (MOSFET), SSR (Lighting), IR LED (Transistor), Buzzers, RGB LEDs.
-- **Time Source:** Synchronized via MQTT from Central Server.
+- **Time Source:** Synchronized via MQTT from Central Server (192.168.70.25).
 
 ## Directory Structure
 Follow this structure for all new files:
@@ -292,22 +292,33 @@ tests/
 Contains simulated drivers and hardware mocks.
 
 Data Flow Examples
-RFID Access
-PN532 Driver
+RFID Access (Outside Reader)
+PN532 Driver (Outside)
    ↓
-AuthProxy Service
+AuthProxy Service (Json Request)
    ↓
-MQTT (Publish UID)
+MQTT (smartclass/.../access/request)
    ↓
-Server (Validate)
+Server (Validate + Dashboard session mgmt)
    ↓
-MQTT (Receive Unlock Command)
+MQTT (smartclass/.../access/response)
    ↓
-CommandHandler
+CommandHandler (Json Parse)
    ↓
-StateMachine
+StateMachine (WAITING -> GRANTED)
    ↓
 DoorLock Driver
+
+Attendance & Control (Inside Reader)
+PN532 Driver (Inside)
+   ↓
+AuthProxy Service (Attendance Json)
+   ↓
+MQTT (smartclass/.../attendance/request)
+   ↓
+(Server decides if UID is Student or Professor)
+   ↓
+(If Professor) -> MQTT (smartclass/.../commands) -> Projector Driver
 
 Occupancy Automation
 PIR Driver
