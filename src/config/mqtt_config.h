@@ -2,7 +2,7 @@
 #define MQTT_CONFIG_H
 
 // --- Broker Configuration ---
-#define MQTT_BROKER_IP   "192.168.70.25"
+#define MQTT_BROKER_IP   "192.168.1.178"
 #define MQTT_PORT        1883
 #define MQTT_CLIENT_ID   "zarzara_node_d3"
 
