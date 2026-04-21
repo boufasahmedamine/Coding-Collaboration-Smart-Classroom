@@ -18,7 +18,7 @@ bool PN532Driver::init() {
         Diagnostics::logEvent(buf);
         // We'll manage per-reader status in a generic way
         _initialized = false;
-        return true; 
+        return false; 
     }
 
     _nfc->SAMConfig();

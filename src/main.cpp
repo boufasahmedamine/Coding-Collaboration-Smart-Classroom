@@ -214,8 +214,8 @@ void setup() {
     bool outReady = rfidOutside.init();
     bool inReady = rfidInside.init();
     
-    Diagnostics::setRFIDStatusOut(outReady ? "READY" : "FAILED");
-    Diagnostics::setRFIDStatusIn(inReady ? "READY" : "FAILED");
+    Diagnostics::setRFIDStatusOut(outReady ? "READY" : "HW NOT FOUND");
+    Diagnostics::setRFIDStatusIn(inReady ? "READY" : "HW NOT FOUND");
 
     doorLock.begin();
     lightingDriver.begin();

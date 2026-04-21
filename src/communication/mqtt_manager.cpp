@@ -1,6 +1,7 @@
 #include "communication/mqtt_manager.h"
 #include "services/network/command_handler.h"
 #include "config/mqtt_config.h"
+#include "system/diagnostics.h"
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -18,18 +19,26 @@ void MQTTManager::begin()
     _client.setCallback([this](char* topic, uint8_t* payload, unsigned int length) {
         this->callback(topic, payload, length);
     });
+    Diagnostics::setBrokerInfo(String(_broker) + ":" + String(_port));
+    Diagnostics::setMQTTStatus("INITIALIZING");
 }
 
 void MQTTManager::update()
 {
     if (WiFi.status() != WL_CONNECTED)
     {
-        return; // Do not attempt to use TCP/IP if WiFi is down
+        Diagnostics::setMQTTStatus("WAITING FOR WIFI");
+        return; 
     }
 
     if (!_client.connected())
     {
+        Diagnostics::setMQTTStatus("DISCONNECTED");
         reconnect();
+    }
+    else
+    {
+        Diagnostics::setMQTTStatus("CONNECTED");
     }
 
     _client.loop();
@@ -68,6 +77,7 @@ void MQTTManager::callback(char* topic, byte* payload, unsigned int length)
 
 void MQTTManager::reconnect()
 {
+    Diagnostics::setMQTTStatus("CONNECTING...");
     if (_client.connect(MQTT_CLIENT_ID))
     {
         Serial.println("[MQTT] Connected to Broker");
