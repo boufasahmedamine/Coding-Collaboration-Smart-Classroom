@@ -7,10 +7,12 @@
 #include "drivers/actuators/ir_projector.h"
 #include <ArduinoJson.h>
 
+class AuthProxy;
+
 class CommandHandler
 {
 public:
-    CommandHandler(StateMachine* sm, TimeService* ts, Lighting* lights, IRProjector* projector);
+    CommandHandler(StateMachine* sm, TimeService* ts, Lighting* lights, IRProjector* projector, AuthProxy* auth = nullptr);
 
     /**
      * Parses incoming MQTT payloads (JSON or Plain String) and executes the logic.
@@ -22,6 +24,7 @@ private:
     TimeService* _timeService;
     Lighting* _lights;
     IRProjector* _projector;
+    AuthProxy* _auth;
 };
 
 #endif

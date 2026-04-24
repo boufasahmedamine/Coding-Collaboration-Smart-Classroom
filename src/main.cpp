@@ -28,6 +28,7 @@
 #include "drivers/rfid/pn532.h"
 #include "services/network/dashboard_service.h"
 #include "config/mqtt_config.h"
+#include "config/wifi_config.h"
 
 // --- FreeRTOS Globals ---
 SemaphoreHandle_t xMutex_SPIBus = NULL;
@@ -39,10 +40,11 @@ SemaphoreHandle_t xMutex_MQTT = NULL;
 
 DoorLockDriver doorLock(PIN_DOOR_LOCK);
 
-WiFiManager wifiManager("SSID", "PASSWORD");
+WiFiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
 MQTTManager mqttManager(MQTT_BROKER_IP, MQTT_PORT);
+AuthProxy authProxy(&mqttManager);
 LogManager logManager(&mqttManager);
-StateMachine stateMachine(doorLock, 5400000); // 1.5 hours
+StateMachine stateMachine(doorLock, 30000, &mqttManager); // 1.5 hours 5400000
 AttendanceManager attendanceManager(&logManager, &stateMachine);
 PN532Driver rfidOutside(PIN_PN532_OUT_CS, "OUTSIDE");
 PN532Driver rfidInside(PIN_PN532_IN_CS, "INSIDE");
@@ -52,7 +54,6 @@ PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
 AutomationController automationController(&presenceService, &lightService);
 TimeService timeService;
-AuthProxy authProxy(&mqttManager);
 
 Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
@@ -62,7 +63,7 @@ ProjectorLogic projectorLogic(projectorDriver, stateMachine, presenceService);
 
 HeartbeatService heartbeat(&mqttManager);
 DashboardService dashboardService(&mqttManager, &stateMachine, &presenceService, &lightingDriver, &projectorDriver);
-CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver);
+CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver, &authProxy);
 
 // --- FreeRTOS Tasks ---
 void vTaskNetwork(void *pvParameters) {
@@ -208,6 +209,8 @@ void setup() {
 
     Diagnostics::init();
     Diagnostics::logEvent("Smart Classroom Node Starting...");
+
+    authProxy.setStateMachine(&stateMachine);
 
     bool outReady = rfidOutside.init();
     bool inReady = rfidInside.init();

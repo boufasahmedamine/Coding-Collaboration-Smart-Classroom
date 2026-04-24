@@ -1,8 +1,9 @@
 #include "system/state_machine.h"
 #include "system/diagnostics.h"
+#include "config/mqtt_config.h"
+#include "communication/mqtt_manager.h"
+#include <ArduinoJson.h>
 #include <Arduino.h>
-
-//#define DEBUG_STATE_MACHINE
 
 static const char* stateToString(StateMachine::SystemState state) {
     switch (state) {
@@ -13,13 +14,16 @@ static const char* stateToString(StateMachine::SystemState state) {
     }
 }
 
-StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs)
+StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, MQTTManager* mqtt)
     : _doorLock(doorLock),
       _currentState(SystemState::LOCKED),
       _sessionStartTime(0),
       _sessionDurationMs(sessionTimeoutMs),
+      _authStartTime(0),
+      _authTimeoutMs(AUTH_TIMEOUT_MS),
       _presenceDetected(false),
-      _overrideActive(false)
+      _overrideActive(false),
+      _mqtt(mqtt)
 {
     _session.active = false;
     _session.uidLength = 0;
@@ -41,26 +45,17 @@ void StateMachine::transitionTo(SystemState newState) {
         return;
     }
 
-#ifdef DEBUG_STATE_MACHINE
-    SystemState oldState = _currentState;
-#endif
-
     _currentState = newState;
-
     Diagnostics::setSystemState(stateToString(_currentState));
 
-#ifdef DEBUG_STATE_MACHINE
-    Serial.print("[SM] ");
-    Serial.print(stateToString(oldState));
-    Serial.print(" -> ");
-    Serial.println(stateToString(_currentState));
-#endif
-
     switch (_currentState) {
-
         case SystemState::UNLOCKED:
             _doorLock.unlock();
             _sessionStartTime = millis();
+            break;
+
+        case SystemState::WAITING_FOR_AUTH:
+            _authStartTime = millis();
             break;
 
         case SystemState::LOCKED:
@@ -72,25 +67,36 @@ void StateMachine::transitionTo(SystemState newState) {
 }
 
 void StateMachine::handleEvent(SystemEvent event, const uint8_t* uid, uint8_t uidLength) {
-
     switch (_currentState) {
-
         case SystemState::LOCKED:
             handleLockedState(event, uid, uidLength);
             break;
 
         case SystemState::WAITING_FOR_AUTH:
-            // Forward events to a new handler for the waiting state
             switch (event) {
+                case SystemEvent::RFID_READ:
+                    // 🔴 ABORT & REPLACE: Reset timer for the new scan
+                    _authStartTime = millis(); 
+                    if (uid != nullptr && uidLength > 0) {
+                        _session.uidLength = uidLength;
+                        memcpy(_session.uid, uid, uidLength);
+                    }
+                    break;
                 case SystemEvent::ACCESS_GRANTED:
                     _session.startTime = millis();
                     _session.active = true;
-                    // UID should have been stored already or passed here
                     transitionTo(SystemState::UNLOCKED);
+                    emitResultEvent("success", "");
                     break;
                 case SystemEvent::ACCESS_DENIED:
                     transitionTo(SystemState::LOCKED);
-                    Diagnostics::logEvent("SM: Access Denied by Server");
+                    Diagnostics::logEvent("SM: Access Denied");
+                    emitResultEvent("rejected", "denied_by_server");
+                    break;
+                case SystemEvent::ACCESS_TIMEOUT:
+                    transitionTo(SystemState::LOCKED);
+                    Diagnostics::logEvent("SM: Auth Timeout");
+                    emitResultEvent("timeout", "server_no_response");
                     break;
                 default:
                     break;
@@ -107,9 +113,7 @@ void StateMachine::handleEvent(SystemEvent event, const uint8_t* uid, uint8_t ui
 }
 
 void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint8_t uidLength) {
-
     switch (event) {
-
         case SystemEvent::RFID_READ:
             if (uid != nullptr && uidLength > 0) {
                 _session.uidLength = uidLength;
@@ -121,20 +125,12 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
         case SystemEvent::ACCESS_GRANTED:
             _session.startTime = millis();
             _session.active = true;
-            if (uid != nullptr && uidLength > 0) {
-                _session.uidLength = uidLength;
-                memcpy(_session.uid, uid, uidLength);
-            }
             transitionTo(SystemState::UNLOCKED);
             break;
 
         case SystemEvent::UNLOCK_REQUEST:
-            Diagnostics::logEvent("SM: Remote Unlock Request processed");
             _session.startTime = millis();
-            _session.uidLength = 0; // Remote unlock might have no UID
             _session.active = true;
-            _session.loggedStart = false;
-            _session.loggedEnd = false;
             transitionTo(SystemState::UNLOCKED);
             break;
 
@@ -142,13 +138,7 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
             _overrideActive = true;
             _session.startTime = millis();
             _session.active = true;
-            _session.loggedStart = false; // Override also starts a session, so initialize flags
-            _session.loggedEnd = false;
             transitionTo(SystemState::UNLOCKED);
-            break;
-
-        case SystemEvent::OVERRIDE_OFF:
-            _overrideActive = false;
             break;
 
         case SystemEvent::PRESENCE_DETECTED:
@@ -165,100 +155,81 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
 }
 
 void StateMachine::handleSessionActiveState(SystemEvent event) {
-
     switch (event) {
-
         case SystemEvent::OVERRIDE_ON:
             _overrideActive = true;
             break;
-
         case SystemEvent::OVERRIDE_OFF:
             _overrideActive = false;
             break;
-
         case SystemEvent::PRESENCE_DETECTED:
             _presenceDetected = true;
             break;
-
         case SystemEvent::PRESENCE_LOST:
             _presenceDetected = false;
             break;
-
         default:
             break;
     }
 }
 
-/*
-Timeout Semantics (Phase 7 Formalization)
-
-1. A session begins when entering SESSION_ACTIVE.
-2. The session duration is fixed at _sessionDurationMs.
-3. Timeout condition is evaluated during update().
-4. Lock transition occurs when:
-    - State == SESSION_ACTIVE
-    - Override is NOT active
-    - Elapsed time >= session duration
-    - Presence is NOT detected
-5. If presence is detected at expiration time,
-   the session remains active until presence is lost.
-6. If override is active at expiration time,
-   the session remains active until override is disabled.
-7. The session timer is NOT reset by presence or override.
-8. Lock occurs immediately once all blocking conditions are cleared.
-*/
 void StateMachine::update() {
+    unsigned long currentTime = millis();
+
     if (_currentState == SystemState::UNLOCKED) {
-
-        // Safety override always keeps it unlocked
-        if (_overrideActive) {
-            return;
-        }
-
-        unsigned long currentTime = millis();
+        if (_overrideActive) return;
 
         if (currentTime - _sessionStartTime >= _sessionDurationMs) {
-
-            // Future: only lock if no presence
             if (!_presenceDetected) {
-                _session.endTime = millis();
+                _session.endTime = currentTime;
                 _session.active = false;
-
                 _doorLock.lock();
                 transitionTo(SystemState::LOCKED);
                 Diagnostics::logEvent("SESSION: Timeout reached. Locking door.");
             }
         }
+    } 
+    else if (_currentState == SystemState::WAITING_FOR_AUTH) {
+        // 🔴 AUTH TIMEOUT Logic
+        if (currentTime - _authStartTime >= _authTimeoutMs) {
+            handleEvent(SystemEvent::ACCESS_TIMEOUT);
+        }
     }
 }
 
-StateMachine::SystemState StateMachine::getState() const
-{
-    return _currentState;
+void StateMachine::cancelPendingRequest() {
+    if (_currentState == SystemState::WAITING_FOR_AUTH) {
+        transitionTo(SystemState::LOCKED);
+    }
 }
 
-SessionRecord& StateMachine::getCurrentSession()
-{
-    return _session;
+void StateMachine::emitResultEvent(const char* status, const char* reason) {
+    if (!_mqtt || !_mqtt->isConnected()) return;
+
+    JsonDocument doc;
+    doc["event"] = "access_result";
+    doc["classroom_name"] = CLASSROOM_NAME;
+    
+    JsonObject data = doc["data"].to<JsonObject>();
+    data["status"] = status;
+    if (strlen(reason) > 0) {
+        data["reason"] = reason;
+    }
+
+    String output;
+    serializeJson(doc, output);
+    _mqtt->publish(TOPIC_EVENTS, output.c_str());
 }
 
-void StateMachine::setPresenceDetected(bool detected) {
-    _presenceDetected = detected;
-}
-
-bool StateMachine::isSessionActive() const {
-    return _session.active;
-}
-
-bool StateMachine::isOverrideActive() const {
-    return _overrideActive;
-}
+StateMachine::SystemState StateMachine::getState() const { return _currentState; }
+SessionRecord& StateMachine::getCurrentSession() { return _session; }
+void StateMachine::setPresenceDetected(bool detected) { _presenceDetected = detected; }
+bool StateMachine::isSessionActive() const { return _session.active; }
+bool StateMachine::isOverrideActive() const { return _overrideActive; }
 
 void StateMachine::setOverrideActive(bool active) {
     _overrideActive = active;
-
-    // Immediate unlock if override activated
     if (_overrideActive && _currentState == SystemState::LOCKED) {
         transitionTo(SystemState::UNLOCKED);
     }
-}
+}

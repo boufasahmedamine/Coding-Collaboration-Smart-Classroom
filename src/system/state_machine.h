@@ -6,6 +6,7 @@
 #include "system/session_record.h"
 
 class AttendanceManager;
+class MQTTManager;
 
 class StateMachine {
 public:
@@ -13,6 +14,7 @@ public:
     RFID_READ,
     ACCESS_GRANTED,
     ACCESS_DENIED,
+    ACCESS_TIMEOUT,
     PRESENCE_DETECTED,
     PRESENCE_LOST,
     OVERRIDE_ON,
@@ -27,30 +29,33 @@ enum class SystemState {
 
     static const unsigned long DEFAULT_SESSION_TIMEOUT_MS = 5400000; // 1.5 hours
 
-    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs); // Removed AttendanceManager
+    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, MQTTManager* mqtt = nullptr);
 
     void init();
     void update();
 
-    // Event handling interface for future expansion
     void handleEvent(SystemEvent event, const uint8_t* uid = nullptr, uint8_t uidLength = 0);
 
-    SystemState getState() const; // Changed return type from State to SystemState
+    SystemState getState() const;
     SessionRecord& getCurrentSession();
 
-    // Future expansion hooks
+    void cancelPendingRequest();
+
     bool isSessionActive() const;
     bool isOverrideActive() const;
     void setPresenceDetected(bool detected);
     void setOverrideActive(bool active);
 
 private:
-    DoorLockDriver& _doorLock; // Changed from DoorLock&
-
-    SystemState _currentState; // Changed type from State
+    DoorLockDriver& _doorLock;
+    SystemState _currentState;
+    MQTTManager* _mqtt;
 
     unsigned long _sessionStartTime;
-    unsigned long _sessionDurationMs; // Kept as sessionDurationMs, as the instruction didn't explicitly change the member variable name.
+    unsigned long _sessionDurationMs;
+    
+    unsigned long _authStartTime;
+    unsigned long _authTimeoutMs;
 
     bool _presenceDetected;
     bool _overrideActive;
@@ -61,6 +66,7 @@ private:
 
     void handleLockedState(SystemEvent event, const uint8_t* uid, uint8_t uidLength);
     void handleSessionActiveState(SystemEvent event);
+    void emitResultEvent(const char* status, const char* reason);
 };
 
 #endif

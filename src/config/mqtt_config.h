@@ -9,6 +9,9 @@
 // --- Classroom Configuration ---
 #define CLASSROOM_NAME   "d3"
 
+// --- Timing Configuration ---
+#define AUTH_TIMEOUT_MS  10000  // 10 seconds to wait for server response
+
 // --- Topic Templates ---
 // smartclass/classrooms/<name>/...
 #define TOPIC_BASE             "smartclass/classrooms/" CLASSROOM_NAME

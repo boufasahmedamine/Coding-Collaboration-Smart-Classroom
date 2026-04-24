@@ -5,22 +5,23 @@
 #include "communication/mqtt_manager.h"
 #include <ArduinoJson.h>
 
+class StateMachine;
+
 class AuthProxy {
 public:
     AuthProxy(MQTTManager* mqtt);
 
-    /**
-     * Publishes a teacher access request for entry (Outside Reader).
-     */
     void requestAuthorization(const uint8_t* uid, uint8_t uidLength);
-
-    /**
-     * Publishes a student attendance request (Inside Reader).
-     */
     void requestAttendance(const uint8_t* uid, uint8_t uidLength);
+
+    void setStateMachine(StateMachine* sm) { _sm = sm; }
+    void handleResponse(JsonDocument& doc);
 
 private:
     MQTTManager* _mqtt;
+    StateMachine* _sm;
+    String _pendingRequestId;
+
     String generateRequestId();
 };
 

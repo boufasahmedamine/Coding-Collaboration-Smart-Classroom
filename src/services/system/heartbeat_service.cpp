@@ -1,9 +1,9 @@
 #include "services/system/heartbeat_service.h"
-#include <Arduino.h>
+#include "config/mqtt_config.h"
+#include <ArduinoJson.h>
 
 HeartbeatService::HeartbeatService(MQTTManager* mqtt)
-    : _mqtt(mqtt),
-      _lastHeartbeat(0)
+    : _mqtt(mqtt), _lastHeartbeat(0)
 {
 }
 
@@ -15,11 +15,19 @@ void HeartbeatService::update()
     {
         _lastHeartbeat = now;
 
-        Serial.println("[HEARTBEAT] Node alive");
-
         if (_mqtt && _mqtt->isConnected())
         {
-            _mqtt->publish("zarzara/node/heartbeat", "alive");
+            JsonDocument doc;
+            doc["event"] = "heartbeat";
+            doc["classroom_name"] = CLASSROOM_NAME;
+            
+            JsonObject data = doc["data"].to<JsonObject>();
+            data["status"] = "alive";
+            data["uptime"] = now / 1000;
+
+            String output;
+            serializeJson(doc, output);
+            _mqtt->publish(TOPIC_EVENTS, output.c_str());
         }
     }
 }
