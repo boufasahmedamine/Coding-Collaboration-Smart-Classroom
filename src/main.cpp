@@ -100,8 +100,10 @@ void vTaskSerialRouter(void *pvParameters) {
                     ESP.restart();
                     break;
                 case 'l':
-                    Diagnostics::logEvent("[MAINT] Manual Door Pulse Triggered");
+                    Diagnostics::logEvent("[MAINT] Manual Door Pulse (3s) Triggered");
                     doorLock.unlock(); 
+                    vTaskDelay(3000 / portTICK_PERIOD_MS);
+                    doorLock.lock();
                     break;
                 case 'v':
                     Diagnostics::setDashboardVisible(!Diagnostics::isDashboardVisible());

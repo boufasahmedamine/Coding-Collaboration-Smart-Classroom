@@ -18,6 +18,12 @@ private:
     const char* _name;
     bool _initialized;
     Adafruit_PN532* _nfc;
+
+    // Debounce State
+    uint8_t _lastUid[7];
+    uint8_t _lastUidLen;
+    unsigned long _lastScanTime;
+    unsigned long _debounceMs;
 };
 
 #endif

@@ -9,8 +9,10 @@
 // --- Classroom Configuration ---
 #define CLASSROOM_NAME   "d3"
 
-// --- Timing Configuration ---
-#define AUTH_TIMEOUT_MS  10000  // 10 seconds to wait for server response
+// --- Timing & Intervals
+#define AUTH_TIMEOUT_MS  10000   // Time to wait for server response
+#define RFID_DEBOUNCE_MS 1000    // Cooldown before accepting same card scan
+#define HEARTBEAT_INTERVAL 30000 
 
 // --- Topic Templates ---
 // smartclass/classrooms/<name>/...

@@ -3,7 +3,7 @@
 
 // --- WiFi Credentials ---
 // Replace these with your actual network details
-#define WIFI_SSID       "NONTAPHAT"
-#define WIFI_PASSWORD   "30828703"
+#define WIFI_SSID       "ZTE_2.4G_BFS"
+#define WIFI_PASSWORD   "uMHUQaQP"
 
 #endif

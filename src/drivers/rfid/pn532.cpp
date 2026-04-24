@@ -1,10 +1,13 @@
 #include "drivers/rfid/pn532.h"
 #include "system/diagnostics.h"
+#include "config/mqtt_config.h"
 #include <string.h>
 
 PN532Driver::PN532Driver(uint8_t csPin, const char* name)
-    : _csPin(csPin), _name(name), _initialized(false), _nfc(nullptr)
+    : _csPin(csPin), _name(name), _initialized(false), _nfc(nullptr),
+      _lastUidLen(0), _lastScanTime(0), _debounceMs(RFID_DEBOUNCE_MS)
 {
+    memset(_lastUid, 0, 7);
 }
 
 bool PN532Driver::init() {
@@ -16,7 +19,6 @@ bool PN532Driver::init() {
         char buf[64];
         snprintf(buf, sizeof(buf), "[RFID] Hardware %s not found on pin %u", _name, _csPin);
         Diagnostics::logEvent(buf);
-        // We'll manage per-reader status in a generic way
         _initialized = false;
         return false; 
     }
@@ -33,11 +35,33 @@ bool PN532Driver::init() {
 bool PN532Driver::readCard(uint8_t* uidBuffer, uint8_t* uidLength) {
     if (!_initialized || !_nfc) return false;
 
-    // VERY IMPORTANT:
-    // We use a small timeout (e.g. 40ms) instead of the default 1000ms.
-    // If we used the default blocking timeout, the RFID FreeRTOS task would stall the SPI bus
-    // for a full second during every empty read cycle, preventing SD logger from working!
-    bool success = _nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uidBuffer, uidLength, 40);
+    uint8_t currentUid[7];
+    uint8_t currentLen;
 
-    return success;
+    // 1. Low-level SPI read (40ms timeout)
+    bool detected = _nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, currentUid, &currentLen, 40);
+    if (!detected) return false;
+
+    // 2. Smart Debounce Logic
+    unsigned long now = millis();
+    bool isSameUid = (currentLen == _lastUidLen) && (memcmp(currentUid, _lastUid, currentLen) == 0);
+    bool timeoutPassed = (now - _lastScanTime >= _debounceMs);
+
+    if (!isSameUid || timeoutPassed) {
+        // ✅ ACCEPT: Different card OR same card after timeout
+        memcpy(_lastUid, currentUid, currentLen);
+        _lastUidLen = currentLen;
+        _lastScanTime = now;
+
+        // Copy to output buffer
+        memcpy(uidBuffer, currentUid, currentLen);
+        *uidLength = currentLen;
+
+        Serial.printf("[RFID] %s: UID accepted\n", _name);
+        return true;
+    } else {
+        // ❌ IGNORE: Same card within window
+        // Serial.printf("[RFID] %s: Duplicate UID ignored (debounce)\n", _name);
+        return false;
+    }
 }
