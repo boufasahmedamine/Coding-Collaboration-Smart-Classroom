@@ -9,6 +9,7 @@
 #include "drivers/pir/pir_driver.h"
 #include "drivers/ldr/ldr_driver.h"
 #include "services/auth/auth_proxy.h"
+#include "services/auth/local_auth_service.h"
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
 #include "services/automation/presence_service.h"
@@ -52,6 +53,7 @@ PIRDriver presenceSensor(PIN_PIR);
 LDRDriver lightSensor(PIN_LDR);
 PresenceService presenceService(&presenceSensor);
 LightService lightService(&lightSensor);
+LocalAuthService localAuth;
 AutomationController automationController(&presenceService, &lightService);
 TimeService timeService;
 
@@ -126,10 +128,18 @@ void vTaskRFID(void *pvParameters) {
 
         if (outsideRead) {
             Diagnostics::logEvent("[RFID] Outside scan detected");
-            authProxy.requestAuthorization(uid, uidLength);
-            if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                stateMachine.handleEvent(StateMachine::SystemEvent::RFID_READ, uid, uidLength);
-                xSemaphoreGive(xMutex_StateMachine);
+            
+            if (localAuth.isAdmin(uid, uidLength)) {
+                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                    stateMachine.handleEvent(StateMachine::SystemEvent::ADMIN_BYPASS, uid, uidLength);
+                    xSemaphoreGive(xMutex_StateMachine);
+                }
+            } else {
+                authProxy.requestAuthorization(uid, uidLength);
+                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                    stateMachine.handleEvent(StateMachine::SystemEvent::RFID_READ, uid, uidLength);
+                    xSemaphoreGive(xMutex_StateMachine);
+                }
             }
         }
 

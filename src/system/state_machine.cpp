@@ -86,17 +86,24 @@ void StateMachine::handleEvent(SystemEvent event, const uint8_t* uid, uint8_t ui
                     _session.startTime = millis();
                     _session.active = true;
                     transitionTo(SystemState::UNLOCKED);
-                    emitResultEvent("success", "");
+                    emitResultEvent("access_result", "success", "");
                     break;
                 case SystemEvent::ACCESS_DENIED:
                     transitionTo(SystemState::LOCKED);
                     Diagnostics::logEvent("SM: Access Denied");
-                    emitResultEvent("rejected", "denied_by_server");
+                    emitResultEvent("access_result", "rejected", "denied_by_server");
                     break;
                 case SystemEvent::ACCESS_TIMEOUT:
                     transitionTo(SystemState::LOCKED);
                     Diagnostics::logEvent("SM: Auth Timeout");
-                    emitResultEvent("timeout", "server_no_response");
+                    emitResultEvent("access_result", "timeout", "server_no_response");
+                    break;
+                case SystemEvent::ADMIN_BYPASS:
+                    _session.startTime = millis();
+                    _session.active = true;
+                    transitionTo(SystemState::UNLOCKED);
+                    Diagnostics::logEvent("SM: Admin Bypass (Local)");
+                    emitResultEvent("admin_access", "success", "local_whitelist");
                     break;
                 default:
                     break;
@@ -139,6 +146,14 @@ void StateMachine::handleLockedState(SystemEvent event, const uint8_t* uid, uint
             _session.startTime = millis();
             _session.active = true;
             transitionTo(SystemState::UNLOCKED);
+            break;
+
+        case SystemEvent::ADMIN_BYPASS:
+            _session.startTime = millis();
+            _session.active = true;
+            transitionTo(SystemState::UNLOCKED);
+            Diagnostics::logEvent("SM: Admin Bypass (Local)");
+            emitResultEvent("admin_access", "success", "local_whitelist");
             break;
 
         case SystemEvent::PRESENCE_DETECTED:
@@ -203,11 +218,11 @@ void StateMachine::cancelPendingRequest() {
     }
 }
 
-void StateMachine::emitResultEvent(const char* status, const char* reason) {
+void StateMachine::emitResultEvent(const char* eventName, const char* status, const char* reason) {
     if (!_mqtt || !_mqtt->isConnected()) return;
 
     JsonDocument doc;
-    doc["event"] = "access_result";
+    doc["event"] = eventName;
     doc["classroom_name"] = CLASSROOM_NAME;
     
     JsonObject data = doc["data"].to<JsonObject>();

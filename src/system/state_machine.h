@@ -15,6 +15,7 @@ public:
     ACCESS_GRANTED,
     ACCESS_DENIED,
     ACCESS_TIMEOUT,
+    ADMIN_BYPASS,
     PRESENCE_DETECTED,
     PRESENCE_LOST,
     OVERRIDE_ON,
@@ -66,7 +67,7 @@ private:
 
     void handleLockedState(SystemEvent event, const uint8_t* uid, uint8_t uidLength);
     void handleSessionActiveState(SystemEvent event);
-    void emitResultEvent(const char* status, const char* reason);
+    void emitResultEvent(const char* eventName, const char* status, const char* reason);
 };
 
 #endif
