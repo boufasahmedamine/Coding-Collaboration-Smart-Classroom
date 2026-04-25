@@ -36,11 +36,15 @@ bool PN532Driver::readCard(uint8_t* uidBuffer, uint8_t* uidLength) {
     if (!_initialized || !_nfc) return false;
 
     uint8_t currentUid[7];
-    uint8_t currentLen;
+    uint8_t currentLen = 7; // Initialize to max length expected by library
 
     // 1. Low-level SPI read (40ms timeout)
     bool detected = _nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, currentUid, &currentLen, 40);
+    
     if (!detected) return false;
+
+    // 🔴 DEBUG: If we got here, hardware definitely saw a card
+    // Serial.printf("[RFID] %s detected card. Checking debounce...\n", _name);
 
     // 2. Smart Debounce Logic
     unsigned long now = millis();
@@ -57,11 +61,9 @@ bool PN532Driver::readCard(uint8_t* uidBuffer, uint8_t* uidLength) {
         memcpy(uidBuffer, currentUid, currentLen);
         *uidLength = currentLen;
 
-        Serial.printf("[RFID] %s: UID accepted\n", _name);
         return true;
     } else {
         // ❌ IGNORE: Same card within window
-        // Serial.printf("[RFID] %s: Duplicate UID ignored (debounce)\n", _name);
         return false;
     }
 }
