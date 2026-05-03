@@ -3,272 +3,160 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
-#include <freertos/queue.h>
+
 #include "config/pins.h"
+#include "config/mqtt_config.h"
+#include "config/wifi_config.h"
+
+// Drivers
 #include "drivers/doorlock/doorlock_driver.h"
 #include "drivers/pir/pir_driver.h"
 #include "drivers/ldr/ldr_driver.h"
+#include "drivers/rfid/pn532.h"
+#include "drivers/actuators/lighting.h"
+#include "drivers/actuators/ir_projector.h"
+
+// Services
+#include "services/auth/access_service.h"
 #include "services/auth/auth_proxy.h"
 #include "services/auth/local_auth_service.h"
 #include "services/attendance/attendance_manager.h"
 #include "services/logging/log_manager.h"
+#include "services/automation/environment_service.h"
 #include "services/automation/presence_service.h"
 #include "services/automation/light_service.h"
 #include "services/automation/automation_controller.h"
 #include "services/automation/lighting_logic.h"
 #include "services/automation/projector_logic.h"
-#include "drivers/actuators/lighting.h"
-#include "drivers/actuators/ir_projector.h"
-#include "communication/wifi_manager.h"
-#include "communication/mqtt_manager.h"
 #include "services/network/command_handler.h"
 #include "services/network/time_service.h"
+#include "services/network/dashboard_service.h"
 #include "services/system/heartbeat_service.h"
+
+// Communication & System
+#include "communication/wifi_manager.h"
+#include "communication/mqtt_manager.h"
 #include "system/state_machine.h"
 #include "system/diagnostics.h"
-#include "drivers/rfid/pn532.h"
-#include "services/network/dashboard_service.h"
-#include "config/mqtt_config.h"
-#include "config/wifi_config.h"
+#include "system/app_manager.h"
 
-// --- FreeRTOS Globals ---
+// --- Global Sync ---
 SemaphoreHandle_t xMutex_SPIBus = NULL;
 SemaphoreHandle_t xMutex_Serial = NULL;
 SemaphoreHandle_t xMutex_StateMachine = NULL;
 SemaphoreHandle_t xMutex_MQTT = NULL;
 
-// ------------------------
-
+// --- Hardware Instances ---
 DoorLockDriver doorLock(PIN_DOOR_LOCK);
-
-WiFiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
-MQTTManager mqttManager(MQTT_BROKER_IP, MQTT_PORT);
-AuthProxy authProxy(&mqttManager);
-LogManager logManager(&mqttManager);
-StateMachine stateMachine(doorLock, 30000, &mqttManager); // 1.5 hours 5400000
-AttendanceManager attendanceManager(&logManager, &stateMachine);
-PN532Driver rfidOutside(PIN_PN532_OUT_CS, "OUTSIDE");
-PN532Driver rfidInside(PIN_PN532_IN_CS, "INSIDE");
+PN532Driver rfidOutside(PIN_PN532_OUT_CS, PIN_PN532_OUT_IRQ, "OUTSIDE");
+PN532Driver rfidInside(PIN_PN532_IN_CS, PIN_PN532_IN_IRQ, "INSIDE");
 PIRDriver presenceSensor(PIN_PIR);
 LDRDriver lightSensor(PIN_LDR);
-PresenceService presenceService(&presenceSensor);
-LightService lightService(&lightSensor);
-LocalAuthService localAuth;
-AutomationController automationController(&presenceService, &lightService);
-TimeService timeService;
-
 Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
 
+// --- Networking ---
+WiFiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
+MQTTManager mqttManager(MQTT_BROKER_IP, MQTT_PORT);
+
+// --- Logical Services ---
+AuthProxy authProxy(&mqttManager);
+LogManager logManager(&mqttManager);
+StateMachine stateMachine(doorLock, 30000, &mqttManager);
+LocalAuthService localAuth;
+TimeService timeService;
+CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver, &authProxy);
+AttendanceManager attendanceManager(&logManager, &stateMachine);
+HeartbeatService heartbeat(&mqttManager);
+
+// Automation Components
+PresenceService presenceService(&presenceSensor);
+LightService lightService(&lightSensor);
+AutomationController automationController(&presenceService, &lightService);
 LightingLogic lightingLogic(lightingDriver, presenceService, lightSensor);
 ProjectorLogic projectorLogic(projectorDriver, stateMachine, presenceService);
 
-HeartbeatService heartbeat(&mqttManager);
+// Dashboard & UI
 DashboardService dashboardService(&mqttManager, &stateMachine, &presenceService, &lightingDriver, &projectorDriver);
-CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver, &authProxy);
 
-// --- FreeRTOS Tasks ---
-void vTaskNetwork(void *pvParameters) {
-    for (;;) {
-        wifiManager.update();
-        
-        if (xSemaphoreTake(xMutex_MQTT, portMAX_DELAY) == pdTRUE) {
-            mqttManager.update();
-            xSemaphoreGive(xMutex_MQTT);
-        }
-        
-        heartbeat.update();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-    }
-}
-
-void vTaskSerialRouter(void *pvParameters) {
-    for (;;) {
-        char c = '\0';
-        if (xSemaphoreTake(xMutex_Serial, portMAX_DELAY) == pdTRUE) {
-            if (Serial.available()) {
-                c = Serial.read();
-            }
-            xSemaphoreGive(xMutex_Serial);
-        }
-
-        if (c != '\0') {
-            switch (c) {
-                case 'r':
-                    Diagnostics::logEvent("[MAINT] System Rebooting...");
-                    vTaskDelay(500 / portTICK_PERIOD_MS);
-                    ESP.restart();
-                    break;
-                case 'l':
-                    Diagnostics::logEvent("[MAINT] Manual Door Pulse (3s) Triggered");
-                    doorLock.unlock(); 
-                    vTaskDelay(3000 / portTICK_PERIOD_MS);
-                    doorLock.lock();
-                    break;
-                case 'v':
-                    Diagnostics::setDashboardVisible(!Diagnostics::isDashboardVisible());
-                    break;
-                case 's':
-                    Diagnostics::logEvent("[MAINT] Forcing State Sync");
-                    dashboardService.update(true); // Force broadcast
-                    break;
-            }
-        }
-        vTaskDelay(50 / portTICK_PERIOD_MS);
-    }
-}
-void vTaskRFID(void *pvParameters) {
-    uint8_t uid[7];
-    uint8_t uidLength;
-    for (;;) {
-        // --- 1. Poll Outside Reader (Access Control) ---
-        bool outsideRead = false;
-        if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
-            outsideRead = rfidOutside.readCard(uid, &uidLength);
-            xSemaphoreGive(xMutex_SPIBus);
-        }
-
-        if (outsideRead) {
-            Diagnostics::logEvent("[RFID] Outside scan detected");
-            
-            if (localAuth.isAdmin(uid, uidLength)) {
-                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                    stateMachine.handleEvent(StateMachine::SystemEvent::ADMIN_BYPASS, uid, uidLength);
-                    xSemaphoreGive(xMutex_StateMachine);
-                }
-            } else {
-                authProxy.requestAuthorization(uid, uidLength);
-                if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-                    stateMachine.handleEvent(StateMachine::SystemEvent::RFID_READ, uid, uidLength);
-                    xSemaphoreGive(xMutex_StateMachine);
-                }
-            }
-        }
-
-        // --- 2. Poll Inside Reader (Attendance / Control) ---
-        bool insideRead = false;
-        vTaskDelay(20 / portTICK_PERIOD_MS); // Brief yield to allow other SPI users
-        if (xSemaphoreTake(xMutex_SPIBus, portMAX_DELAY) == pdTRUE) {
-            insideRead = rfidInside.readCard(uid, &uidLength);
-            xSemaphoreGive(xMutex_SPIBus);
-        }
-
-        if (insideRead) {
-            Diagnostics::logEvent("[RFID] Inside scan detected");
-            authProxy.requestAttendance(uid, uidLength);
-            // Inside scans don't usually change the entry state machine but log events
-        }
-
-        vTaskDelay(100 / portTICK_PERIOD_MS); 
-    }
-}
-
-void vTaskStatus(void *pvParameters) {
-    for (;;) {
-        attendanceManager.update();
-        dashboardService.update(); // Synchronous update with status task
-        
-        vTaskDelay(1000 / portTICK_PERIOD_MS); 
-    }
-}
-
-void vTaskDiagnostics(void *pvParameters) {
-    for (;;) {
-#if ENABLE_DIAGNOSTICS_DASHBOARD
-        Diagnostics::updateTable();
-#endif
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-}
-
-void vTaskCoreLogic(void *pvParameters) {
-    for (;;) {
-        presenceSensor.update();
-        lightSensor.update();
-        Diagnostics::setLDRValue(lightSensor.getLightLevel());
-        presenceService.update();
-        lightService.update();
-        automationController.update();
-        lightingLogic.update();
-        projectorLogic.update();
-        
-        // Safety lock around state machine updates if network task commands it concurrently
-        if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
-            stateMachine.update();
-            xSemaphoreGive(xMutex_StateMachine);
-        }
-
-        if (presenceService.justBecameOccupied()) {
-            Diagnostics::logEvent("PRESENCE: Room became occupied");
-        }
-        if (presenceService.justBecameEmpty()) {
-            Diagnostics::logEvent("PRESENCE: Room became empty");
-        }
-        if (lightService.isDark()) {
-            // Can be noisy, omitted or log specific changes
-        }
-        
-        vTaskDelay(50 / portTICK_PERIOD_MS); // Logic engine runs at 20Hz
-    }
-}
-// ----------------------
+// --- High-Level Managers ---
+AccessService accessService(&rfidOutside, &rfidInside, &authProxy, &localAuth, &stateMachine);
+EnvironmentService environmentService(&presenceSensor, &lightSensor, &presenceService, &lightService, &automationController, &lightingLogic, &projectorLogic);
+AppManager appManager(&wifiManager, &mqttManager, &accessService, &environmentService, &heartbeat, &dashboardService, &attendanceManager);
 
 void setup() {
     Serial.begin(115200);
     delay(100);
 
-    // Initialize global SPI Bus
-    SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
-
-    Diagnostics::init();
-    Diagnostics::logEvent("Smart Classroom Node Starting...");
-
-    authProxy.setStateMachine(&stateMachine);
-
-    bool outReady = rfidOutside.init();
-    bool inReady = rfidInside.init();
-    
-    Diagnostics::setRFIDStatusOut(outReady ? "READY" : "HW NOT FOUND");
-    Diagnostics::setRFIDStatusIn(inReady ? "READY" : "HW NOT FOUND");
-
-    doorLock.begin();
-    lightingDriver.begin();
-    projectorDriver.begin();
-    presenceSensor.begin();
-    lightSensor.begin();
-    
-    // Safety: ensure actuators are off
-    lightingDriver.turnOff();
-    projectorDriver.turnOff();
-    
-    stateMachine.init();
-    wifiManager.begin();
-    mqttManager.begin();
-    mqttManager.setCommandHandler(&commandHandler);
-
-    // --- FreeRTOS Initialization ---
+    // 1. Initialize Sync Primitives
     xMutex_SPIBus = xSemaphoreCreateMutex();
     xMutex_Serial = xSemaphoreCreateMutex();
     xMutex_StateMachine = xSemaphoreCreateMutex();
     xMutex_MQTT = xSemaphoreCreateMutex();
 
-    xTaskCreatePinnedToCore(vTaskNetwork, "NetworkTask", 8192, NULL, 2, NULL, 0);
-    xTaskCreatePinnedToCore(vTaskSerialRouter, "SerialRouter", 2048, NULL, 1, NULL, 0);
+    // 2. Initialize Hardware & HAL
+    SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
+    Diagnostics::init();
+    Diagnostics::logEvent("Smart Classroom Node Starting...");
 
-    // Core 1 Tasks (Application Logic + Sensors)
-    xTaskCreatePinnedToCore(vTaskRFID, "RFIDTask", 4096, NULL, 3, NULL, 1);
-    xTaskCreatePinnedToCore(vTaskStatus, "StatusTask", 6144, NULL, 1, NULL, 1);
-    xTaskCreatePinnedToCore(vTaskCoreLogic, "CoreLogic", 8192, NULL, 2, NULL, 1);
-#if ENABLE_DIAGNOSTICS_DASHBOARD
-    xTaskCreatePinnedToCore(vTaskDiagnostics, "Diagnostics", 4096, NULL, 1, NULL, 1);
-#endif
+    doorLock.begin();
+    lightingDriver.begin();
+    projectorDriver.begin();
+    
+    // Safety: ensure actuators are off
+    lightingDriver.turnOff();
+    projectorDriver.turnOff();
 
-    Diagnostics::logEvent("System fully booted. waiting for events.");
+    // 3. Initialize Domain Services
+    authProxy.setStateMachine(&stateMachine);
+    stateMachine.init();
+    wifiManager.begin();
+    mqttManager.begin();
+    mqttManager.setCommandHandler(&commandHandler);
+
+    // 4. Initialize Composite Services (Access & Environment)
+    accessService.init();
+    environmentService.init();
+
+    // 5. Hand over control to AppManager
+    appManager.start();
+
+    Diagnostics::logEvent("System fully booted. Waiting for events.");
 }
 
 void loop() {
-    // The main loop is intentionally left empty.
-    // Under FreeRTOS, Arduino's loop() runs as a Core 1 task.
-    // We delay it infinitely so the scheduler fully yields to our custom tasks.
-    vTaskDelay(portMAX_DELAY);
+    // Under FreeRTOS, loop() runs as a priority-1 task on Core 1.
+    // We handle the Serial Router logic here to keep it out of setup().
+    char c = '\0';
+    if (xSemaphoreTake(xMutex_Serial, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (Serial.available()) {
+            c = Serial.read();
+        }
+        xSemaphoreGive(xMutex_Serial);
+    }
+
+    if (c != '\0') {
+        switch (c) {
+            case 'r':
+                Diagnostics::logEvent("[MAINT] System Rebooting...");
+                delay(500);
+                ESP.restart();
+                break;
+            case 'l':
+                Diagnostics::logEvent("[MAINT] Manual Door Pulse Triggered");
+                doorLock.unlock(); 
+                delay(3000);
+                doorLock.lock();
+                break;
+            case 'v':
+                Diagnostics::setDashboardVisible(!Diagnostics::isDashboardVisible());
+                break;
+            case 's':
+                Diagnostics::logEvent("[MAINT] Forcing State Sync");
+                dashboardService.update(true);
+                break;
+        }
+    }
+
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 }

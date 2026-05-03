@@ -7,17 +7,24 @@
 
 class PN532Driver {
 public:
-    PN532Driver(uint8_t csPin = 5, const char* name = "RFID");
+    PN532Driver(uint8_t csPin, uint8_t irqPin, const char* name = "RFID");
 
     bool init();
+    bool isAlive();
+    void resetCommunication();
 
     virtual bool readCard(uint8_t* uidBuffer, uint8_t* uidLength);
 
 private:
     uint8_t _csPin;
+    uint8_t _irqPin;
     const char* _name;
     bool _initialized;
     Adafruit_PN532* _nfc;
+
+    // Health Monitoring
+    unsigned long _lastSuccessfulRead;
+    const unsigned long _healthCheckInterval = 10000; // Check every 10s if no cards seen
 
     // Debounce State
     uint8_t _lastUid[7];

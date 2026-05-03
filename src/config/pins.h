@@ -10,7 +10,11 @@
 // --- CHIP SELECTS ---
 // Must be unique to prevent bus collisions! 
 #define PIN_PN532_OUT_CS  22   // Dedicated CS for Outside RFID (Authorized Entry)
+#define PIN_PN532_OUT_IRQ 4    // NEW: IRQ for Outside Reader
 #define PIN_PN532_IN_CS   5    // Dedicated CS for Inside RFID (Attendance/Control)
+#define PIN_PN532_IN_IRQ  13   // NEW: IRQ for Inside Reader
+
+#define PN532_SPI_CLOCK   1000000 // Throttled to 1MHz for breadboard stability
 
 // --- DIGITAL SENSORS ---
 #define PIN_PIR        16   // Reclaimed from Radar RX

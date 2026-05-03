@@ -12,7 +12,7 @@
 class MockPN532 : public PN532Driver {
 public:
     MockPN532(const char* name = "MOCK_RFID") 
-        : PN532Driver(0, name), _pendingRead(false) {}
+        : PN532Driver(0, 0, name), _pendingRead(false) {}
 
     /**
      * Inject a card into the reader for the next pull.
