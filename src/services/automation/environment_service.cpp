@@ -17,23 +17,15 @@ void EnvironmentService::init() {
 }
 
 void EnvironmentService::update() {
-    // Update Sensors
     _pir->update();
     _ldr->update();
-    
-    // Update Diagnostics
     Diagnostics::setLDRValue(_ldr->getLightLevel());
-
-    // Update Services
     _presence->update();
     _light->update();
-    
-    // Update Logic
     _controller->update();
     _lightingLogic->update();
     _projectorLogic->update();
 
-    // Log Presence changes
     if (_presence->justBecameOccupied()) {
         Diagnostics::logEvent("PRESENCE: Room became occupied");
     }

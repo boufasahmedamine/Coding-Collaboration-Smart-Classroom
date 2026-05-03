@@ -13,14 +13,10 @@ AppManager::AppManager(WiFiManager* wifi, MQTTManager* mqtt,
 }
 
 void AppManager::start() {
-    // Core 0 Tasks (Networking)
     xTaskCreatePinnedToCore(vTaskNetwork, "NetworkTask", 8192, this, 2, NULL, 0);
-
-    // Core 1 Tasks (Application Logic + Sensors)
     xTaskCreatePinnedToCore(vTaskRFID, "RFIDTask", 4096, this, 3, NULL, 1);
     xTaskCreatePinnedToCore(vTaskStatus, "StatusTask", 6144, this, 1, NULL, 1);
     xTaskCreatePinnedToCore(vTaskCoreLogic, "CoreLogic", 8192, this, 2, NULL, 1);
-    
 #if ENABLE_DIAGNOSTICS_DASHBOARD
     xTaskCreatePinnedToCore(vTaskDiagnostics, "Diagnostics", 4096, NULL, 1, NULL, 1);
 #endif
@@ -30,12 +26,10 @@ void AppManager::vTaskNetwork(void* pvParameters) {
     AppManager* app = (AppManager*)pvParameters;
     for (;;) {
         app->_wifi->update();
-        
         if (xSemaphoreTake(xMutex_MQTT, portMAX_DELAY) == pdTRUE) {
             app->_mqtt->update();
             xSemaphoreGive(xMutex_MQTT);
         }
-        
         app->_hb->update();
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
@@ -45,7 +39,7 @@ void AppManager::vTaskRFID(void* pvParameters) {
     AppManager* app = (AppManager*)pvParameters;
     for (;;) {
         app->_access->update();
-        vTaskDelay(50 / portTICK_PERIOD_MS); // Yield 20Hz
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -53,7 +47,7 @@ void AppManager::vTaskCoreLogic(void* pvParameters) {
     AppManager* app = (AppManager*)pvParameters;
     for (;;) {
         app->_env->update();
-        vTaskDelay(50 / portTICK_PERIOD_MS); // Logic engine runs at 20Hz
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 

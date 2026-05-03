@@ -76,11 +76,12 @@ void AccessService::performHealthCheck() {
     _lastHeartbeat = millis();
 
     if (xMutex_SPIBus && xSemaphoreTake(xMutex_SPIBus, 50 / portTICK_PERIOD_MS) == pdTRUE) {
-        if (!_rfidOutside->isAlive()) {
+        // Only heartbeat/recover if the reader was present at boot
+        if (_rfidOutside->isInitialized() && !_rfidOutside->isAlive()) {
             Diagnostics::logEvent("[RFID] OUT failure detected! Recovering...");
             _rfidOutside->resetCommunication();
         }
-        if (!_rfidInside->isAlive()) {
+        if (_rfidInside->isInitialized() && !_rfidInside->isAlive()) {
             Diagnostics::logEvent("[RFID] IN failure detected! Recovering...");
             _rfidInside->resetCommunication();
         }

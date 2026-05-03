@@ -12,6 +12,7 @@ public:
     bool init();
     bool isAlive();
     void resetCommunication();
+    bool isInitialized() const { return _initialized; }
 
     virtual bool readCard(uint8_t* uidBuffer, uint8_t* uidLength);
 
