@@ -185,6 +185,7 @@ void vTaskCoreLogic(void *pvParameters) {
     for (;;) {
         presenceSensor.update();
         lightSensor.update();
+        Diagnostics::setLDRValue(lightSensor.getLightLevel());
         presenceService.update();
         lightService.update();
         automationController.update();

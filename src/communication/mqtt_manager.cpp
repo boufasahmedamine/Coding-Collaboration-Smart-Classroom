@@ -9,7 +9,8 @@ MQTTManager::MQTTManager(const char* broker, int port)
     : _broker(broker),
       _port(port),
       _client(_wifiClient),
-      _commandHandler(nullptr)
+      _commandHandler(nullptr),
+      _lastReconnectAttempt(0)
 {
 }
 
@@ -34,7 +35,13 @@ void MQTTManager::update()
     if (!_client.connected())
     {
         Diagnostics::setMQTTStatus("DISCONNECTED");
-        reconnect();
+        
+        unsigned long now = millis();
+        if (now - _lastReconnectAttempt > _reconnectInterval)
+        {
+            _lastReconnectAttempt = now;
+            reconnect();
+        }
     }
     else
     {

@@ -29,6 +29,9 @@ private:
 
     void reconnect();
     void callback(char* topic, byte* payload, unsigned int length);
+
+    unsigned long _lastReconnectAttempt;
+    const unsigned long _reconnectInterval = 5000; // Retry every 5 seconds
 };
 
 #endif

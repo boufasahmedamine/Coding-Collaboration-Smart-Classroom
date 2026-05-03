@@ -37,6 +37,7 @@ StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeou
 void StateMachine::init() {
     _doorLock.begin();
     _session.active = false;
+    Diagnostics::setSystemState(stateToString(SystemState::LOCKED));
     transitionTo(SystemState::LOCKED);
 }
 
