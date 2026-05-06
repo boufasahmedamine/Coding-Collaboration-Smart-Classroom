@@ -1,12 +1,12 @@
 #include "tests/test_auth_proxy.h"
-#include "tests/mock_pn532.h"
+#include "tests/mock_rfid_reader.h"
 #include "services/auth/auth_proxy.h"
 #include "communication/mqtt_manager.h"
 #include <Arduino.h>
 
 static MQTTManager dummyMqtt("127.0.0.1", 1883);
 static AuthProxy authProxy(&dummyMqtt);
-static MockPN532 mockRFID("MOCK_READER");
+static MockRFIDReader mockRFID;
 
 void runAuthProxyTest() {
     static bool initialized = false;
@@ -22,7 +22,7 @@ void runAuthProxyTest() {
         char c = Serial.read();
         if (c == 'i') {
             uint8_t uid[] = {0x12, 0x34, 0x56, 0x78};
-            mockRFID.injectCard(uid, 4);
+            mockRFID.simulateCard(uid);
             Serial.println("[TEST] Card injected into mock reader.");
         }
     }

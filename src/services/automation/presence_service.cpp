@@ -1,6 +1,6 @@
 #include "services/automation/presence_service.h"
 
-PresenceService::PresenceService(PIRDriver* driver)
+PresenceService::PresenceService(MainsPIRInput* driver)
     : _driver(driver),
       _occupied(false),
       _previousState(false)

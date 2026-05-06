@@ -2,7 +2,7 @@
 #include "system/diagnostics.h"
 #include <Arduino.h>
 
-EnvironmentService::EnvironmentService(PIRDriver* pir, LDRDriver* ldr, 
+EnvironmentService::EnvironmentService(MainsPIRInput* pir, LDRDriver* ldr, 
                                        PresenceService* presence, LightService* light,
                                        AutomationController* controller, 
                                        LightingLogic* lightingLogic, ProjectorLogic* projectorLogic)

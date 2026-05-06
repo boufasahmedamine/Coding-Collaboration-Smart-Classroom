@@ -8,11 +8,10 @@
 #include "config/mqtt_config.h"
 #include "config/wifi_config.h"
 
-// Drivers
 #include "drivers/doorlock/doorlock_driver.h"
-#include "drivers/pir/pir_driver.h"
+#include "drivers/sensors/mains_pir_input.h"
 #include "drivers/ldr/ldr_driver.h"
-#include "drivers/rfid/pn532.h"
+#include "drivers/rfid/rdm6300.h"
 #include "drivers/actuators/lighting.h"
 #include "drivers/actuators/ir_projector.h"
 
@@ -41,16 +40,21 @@
 #include "system/app_manager.h"
 
 // --- Global Sync ---
-SemaphoreHandle_t xMutex_SPIBus = NULL;
 SemaphoreHandle_t xMutex_Serial = NULL;
 SemaphoreHandle_t xMutex_StateMachine = NULL;
 SemaphoreHandle_t xMutex_MQTT = NULL;
 
 // --- Hardware Instances ---
 DoorLockDriver doorLock(PIN_DOOR_LOCK);
-PN532Driver rfidOutside(PIN_PN532_OUT_CS, PIN_PN532_OUT_IRQ, "OUTSIDE");
-PN532Driver rfidInside(PIN_PN532_IN_CS, PIN_PN532_IN_IRQ, "INSIDE");
-PIRDriver presenceSensor(PIN_PIR);
+
+// Allocate UART1 and UART2 explicitly
+HardwareSerial rdmOutsideSerial(1);
+HardwareSerial rdmInsideSerial(2);
+
+RDM6300Driver rfidOutside(&rdmOutsideSerial, PIN_RDM6300_OUT_RX, "OUTSIDE");
+RDM6300Driver rfidInside(&rdmInsideSerial, PIN_RDM6300_IN_RX, "INSIDE");
+
+MainsPIRInput presenceSensor(PIN_MAINS_PIR_INPUT);
 LDRDriver lightSensor(PIN_LDR);
 Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
@@ -89,13 +93,11 @@ void setup() {
     delay(100);
 
     // 1. Initialize Sync Primitives
-    xMutex_SPIBus = xSemaphoreCreateMutex();
     xMutex_Serial = xSemaphoreCreateMutex();
     xMutex_StateMachine = xSemaphoreCreateMutex();
     xMutex_MQTT = xSemaphoreCreateMutex();
 
     // 2. Initialize Hardware & HAL
-    SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
     Diagnostics::init();
     Diagnostics::logEvent("Smart Classroom Node Starting...");
 

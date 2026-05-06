@@ -1,24 +1,12 @@
 #ifndef PINS_H
 #define PINS_H
 
-// --- SPI BUS ---
-// Standard VSPI pins for ESP32
-#define PIN_SPI_SCK    18
-#define PIN_SPI_MISO   19
-#define PIN_SPI_MOSI   23
-
-// --- CHIP SELECTS ---
-// Must be unique to prevent bus collisions! 
-#define PIN_PN532_OUT_CS  22   // Dedicated CS for Outside RFID (Authorized Entry)
-#define PIN_PN532_OUT_IRQ 4    // NEW: IRQ for Outside Reader
-#define PIN_PN532_IN_CS   5    // Dedicated CS for Inside RFID (Attendance/Control)
-#define PIN_PN532_IN_IRQ  13   // NEW: IRQ for Inside Reader
-
-#define PN532_SPI_CLOCK   1000000 // Throttled to 1MHz for breadboard stability
+// --- UART SENSORS (RDM6300) ---
+#define PIN_RDM6300_OUT_RX 16  // UART1 RX for Outside RFID
+#define PIN_RDM6300_IN_RX  17  // UART2 RX for Inside RFID
 
 // --- DIGITAL SENSORS ---
-#define PIN_PIR        16   // Reclaimed from Radar RX
-// PIN_RADAR_TX (17) is reclaimed
+#define PIN_MAINS_PIR_INPUT 4  // Opto-isolated 220V PIR (Active LOW)
 
 // --- ANALOG SENSORS ---
 // Photoresistor

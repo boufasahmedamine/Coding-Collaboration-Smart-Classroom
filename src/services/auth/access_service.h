@@ -1,7 +1,7 @@
 #ifndef ACCESS_SERVICE_H
 #define ACCESS_SERVICE_H
 
-#include "drivers/rfid/pn532.h"
+#include "drivers/rfid/irfid_reader.h"
 #include "services/auth/auth_proxy.h"
 #include "services/auth/local_auth_service.h"
 #include "system/state_machine.h"
@@ -10,15 +10,15 @@
 
 class AccessService {
 public:
-    AccessService(PN532Driver* outside, PN532Driver* inside, 
+    AccessService(IRFIDReader* outside, IRFIDReader* inside, 
                   AuthProxy* proxy, LocalAuthService* local, StateMachine* sm);
 
     void init();
     void update(); // Called within the RFID task
 
 private:
-    PN532Driver* _rfidOutside;
-    PN532Driver* _rfidInside;
+    IRFIDReader* _rfidOutside;
+    IRFIDReader* _rfidInside;
     AuthProxy* _authProxy;
     LocalAuthService* _localAuth;
     StateMachine* _stateMachine;

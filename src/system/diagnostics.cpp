@@ -66,11 +66,10 @@ namespace Diagnostics {
             
             // --- Hardware Logic Probe Section ---
             Serial.println("----------- Hardware Pin Monitor -----------------");
-            Serial.printf("PIR (16): %-4s | LDR (34): %-4d | DOOR (25): %s\n", 
-                (digitalRead(16) == HIGH ? "HIGH" : "LOW"), analogRead(34), (digitalRead(25) == HIGH ? "HIGH" : "LOW"));
-            Serial.printf("IRQ_O(4): %-4s | IRQ_I(13): %-4s | CS_O(22): %-4s | CS_I(5): %s\n",
-                (digitalRead(4) == HIGH ? "HIGH" : "LOW"), (digitalRead(13) == HIGH ? "HIGH" : "LOW"),
-                (digitalRead(22) == HIGH ? "HIGH" : "LOW"), (digitalRead(5) == HIGH ? "HIGH" : "LOW"));
+            Serial.printf("PIR (4): %-4s | LDR (34): %-4d | DOOR (25): %s\n", 
+                (digitalRead(4) == HIGH ? "HIGH" : "LOW"), analogRead(34), (digitalRead(25) == HIGH ? "HIGH" : "LOW"));
+            Serial.printf("RDM_O(16): %-4s | RDM_I(17): %-4s\n",
+                (digitalRead(16) == HIGH ? "HIGH" : "LOW"), (digitalRead(17) == HIGH ? "HIGH" : "LOW"));
             Serial.println("==================================================");
             
             xSemaphoreGive(xMutex_Serial);

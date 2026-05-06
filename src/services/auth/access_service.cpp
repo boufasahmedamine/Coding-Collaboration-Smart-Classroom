@@ -2,10 +2,9 @@
 #include "system/diagnostics.h"
 #include <Arduino.h>
 
-extern SemaphoreHandle_t xMutex_SPIBus;
 extern SemaphoreHandle_t xMutex_StateMachine;
 
-AccessService::AccessService(PN532Driver* outside, PN532Driver* inside, 
+AccessService::AccessService(IRFIDReader* outside, IRFIDReader* inside, 
                              AuthProxy* proxy, LocalAuthService* local, StateMachine* sm)
     : _rfidOutside(outside), _rfidInside(inside), 
       _authProxy(proxy), _localAuth(local), _stateMachine(sm),
@@ -24,22 +23,14 @@ void AccessService::update() {
     uint8_t uidLength;
 
     // --- 1. Poll Outside Reader (Access Control) ---
-    bool outsideRead = false;
-    if (xMutex_SPIBus && xSemaphoreTake(xMutex_SPIBus, 10 / portTICK_PERIOD_MS) == pdTRUE) {
-        outsideRead = _rfidOutside->readCard(uid, &uidLength);
-        xSemaphoreGive(xMutex_SPIBus);
-    }
+    bool outsideRead = _rfidOutside->readCard(uid, &uidLength);
 
     if (outsideRead) {
         handleOutsideScan(uid, uidLength);
     }
 
     // --- 2. Poll Inside Reader (Attendance) ---
-    bool insideRead = false;
-    if (xMutex_SPIBus && xSemaphoreTake(xMutex_SPIBus, 10 / portTICK_PERIOD_MS) == pdTRUE) {
-        insideRead = _rfidInside->readCard(uid, &uidLength);
-        xSemaphoreGive(xMutex_SPIBus);
-    }
+    bool insideRead = _rfidInside->readCard(uid, &uidLength);
 
     if (insideRead) {
         handleInsideScan(uid, uidLength);
@@ -75,16 +66,13 @@ void AccessService::performHealthCheck() {
     if (millis() - _lastHeartbeat < _heartbeatInterval) return;
     _lastHeartbeat = millis();
 
-    if (xMutex_SPIBus && xSemaphoreTake(xMutex_SPIBus, 50 / portTICK_PERIOD_MS) == pdTRUE) {
-        // Only heartbeat/recover if the reader was present at boot
-        if (_rfidOutside->isInitialized() && !_rfidOutside->isAlive()) {
-            Diagnostics::logEvent("[RFID] OUT failure detected! Recovering...");
-            _rfidOutside->resetCommunication();
-        }
-        if (_rfidInside->isInitialized() && !_rfidInside->isAlive()) {
-            Diagnostics::logEvent("[RFID] IN failure detected! Recovering...");
-            _rfidInside->resetCommunication();
-        }
-        xSemaphoreGive(xMutex_SPIBus);
+    // Only heartbeat/recover if the reader was present at boot
+    if (_rfidOutside->isInitialized() && !_rfidOutside->isAlive()) {
+        Diagnostics::logEvent("[RFID] OUT failure detected! Recovering...");
+        _rfidOutside->resetCommunication();
+    }
+    if (_rfidInside->isInitialized() && !_rfidInside->isAlive()) {
+        Diagnostics::logEvent("[RFID] IN failure detected! Recovering...");
+        _rfidInside->resetCommunication();
     }
 }

@@ -1,12 +1,12 @@
 #ifndef PRESENCE_SERVICE_H
 #define PRESENCE_SERVICE_H
 
-#include "drivers/pir/pir_driver.h"
+#include "drivers/sensors/mains_pir_input.h"
 
 class PresenceService
 {
 public:
-    PresenceService(PIRDriver* driver);
+    PresenceService(MainsPIRInput* driver);
 
     void update();
 
@@ -15,7 +15,7 @@ public:
     bool justBecameEmpty();
 
 private:
-    PIRDriver* _driver;
+    MainsPIRInput* _driver;
 
     bool _occupied;
     bool _previousState;
