@@ -1,5 +1,6 @@
 #include "drivers/rfid/rdm6300.h"
 #include "system/diagnostics.h"
+#include "config/mqtt_config.h"
 #include <string.h>
 
 RDM6300Driver::RDM6300Driver(HardwareSerial* serialPort, uint8_t rxPin, const char* name)

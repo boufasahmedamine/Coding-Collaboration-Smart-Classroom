@@ -11,8 +11,6 @@
 #define RDM6300_FRAME_SIZE 14
 #define RDM6300_TIMEOUT_MS 50
 
-#define RFID_DEBOUNCE_MS 2000
-
 class RDM6300Driver : public IRFIDReader {
 public:
     RDM6300Driver(HardwareSerial* serialPort, uint8_t rxPin, const char* name);
