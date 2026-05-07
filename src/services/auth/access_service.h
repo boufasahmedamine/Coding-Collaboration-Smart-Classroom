@@ -5,13 +5,14 @@
 #include "services/auth/auth_proxy.h"
 #include "services/auth/local_auth_service.h"
 #include "system/state_machine.h"
+#include "services/automation/projector_logic.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
 class AccessService {
 public:
     AccessService(IRFIDReader* outside, IRFIDReader* inside, 
-                  AuthProxy* proxy, LocalAuthService* local, StateMachine* sm);
+                  AuthProxy* proxy, LocalAuthService* local, StateMachine* sm, ProjectorLogic* projector);
 
     void init();
     void update(); // Called within the RFID task
@@ -22,6 +23,7 @@ private:
     AuthProxy* _authProxy;
     LocalAuthService* _localAuth;
     StateMachine* _stateMachine;
+    ProjectorLogic* _projectorLogic;
 
     unsigned long _lastHeartbeat;
     const unsigned long _heartbeatInterval = 5000;

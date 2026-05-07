@@ -5,9 +5,9 @@
 extern SemaphoreHandle_t xMutex_StateMachine;
 
 AccessService::AccessService(IRFIDReader* outside, IRFIDReader* inside, 
-                             AuthProxy* proxy, LocalAuthService* local, StateMachine* sm)
+                             AuthProxy* proxy, LocalAuthService* local, StateMachine* sm, ProjectorLogic* projector)
     : _rfidOutside(outside), _rfidInside(inside), 
-      _authProxy(proxy), _localAuth(local), _stateMachine(sm),
+      _authProxy(proxy), _localAuth(local), _stateMachine(sm), _projectorLogic(projector),
       _lastHeartbeat(0)
 {
 }
@@ -59,6 +59,15 @@ void AccessService::handleOutsideScan(uint8_t* uid, uint8_t len) {
 
 void AccessService::handleInsideScan(uint8_t* uid, uint8_t len) {
     Diagnostics::logEvent("[RFID] Inside scan detected");
+    
+    // Special Action: Teacher/Admin scan on inside reader authorizes the projector
+    if (_localAuth->isAdmin(uid, len)) {
+        Diagnostics::logEvent("[RFID] Teacher/Admin Inside - Projector Authorized");
+        if (_projectorLogic) {
+            _projectorLogic->setAuthorized(true);
+        }
+    }
+    
     _authProxy->requestAttendance(uid, len);
 }
 

@@ -1,18 +1,17 @@
 #include "services/automation/projector_logic.h"
 
-ProjectorLogic::ProjectorLogic(IRProjector& projector, StateMachine& sm, PresenceService& presence)
-    : _projector(projector), _stateMachine(sm), _presence(presence), _lastState(false)
+ProjectorLogic::ProjectorLogic(IRProjector& projector, StateMachine& sm)
+    : _projector(projector), _stateMachine(sm), _lastState(false), _authorized(false)
 {
 }
 
 void ProjectorLogic::update()
 {
-    // Safety Rule: Activated only when session is active, override is NOT active, and room is occupied
+    // Projector logic: Active only when session is active, override is NOT active, and teacher authorized it
     bool sessionActive = _stateMachine.isSessionActive();
     bool overrideActive = _stateMachine.isOverrideActive();
-    bool occupied = _presence.isOccupied();
 
-    bool shouldBeOn = sessionActive && !overrideActive && occupied;
+    bool shouldBeOn = sessionActive && !overrideActive && _authorized;
     
     if (shouldBeOn != _lastState)
     {
@@ -25,5 +24,10 @@ void ProjectorLogic::update()
             _projector.turnOff();
         }
         _lastState = shouldBeOn;
+    }
+
+    // Reset authorization when session ends
+    if (!sessionActive) {
+        _authorized = false;
     }
 }

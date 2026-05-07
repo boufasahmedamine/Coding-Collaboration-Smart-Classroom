@@ -23,7 +23,6 @@ namespace Diagnostics {
 
     void setDashboardVisible(bool visible);
     bool isDashboardVisible();
-    void setLDRValue(int value);
     void setLightingStatus(const String& status);
     void logEvent(const String& eventStr);
 

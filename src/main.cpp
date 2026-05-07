@@ -10,7 +10,6 @@
 
 #include "drivers/doorlock/doorlock_driver.h"
 #include "drivers/sensors/mains_pir_input.h"
-#include "drivers/ldr/ldr_driver.h"
 #include "drivers/rfid/rdm6300.h"
 #include "drivers/actuators/lighting.h"
 #include "drivers/actuators/ir_projector.h"
@@ -23,8 +22,6 @@
 #include "services/logging/log_manager.h"
 #include "services/automation/environment_service.h"
 #include "services/automation/presence_service.h"
-#include "services/automation/light_service.h"
-#include "services/automation/automation_controller.h"
 #include "services/automation/lighting_logic.h"
 #include "services/automation/projector_logic.h"
 #include "services/network/command_handler.h"
@@ -55,7 +52,6 @@ RDM6300Driver rfidOutside(&rdmOutsideSerial, PIN_RDM6300_OUT_RX, "OUTSIDE");
 RDM6300Driver rfidInside(&rdmInsideSerial, PIN_RDM6300_IN_RX, "INSIDE");
 
 MainsPIRInput presenceSensor(PIN_MAINS_PIR_INPUT);
-LDRDriver lightSensor(PIN_LDR);
 Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
 
@@ -66,7 +62,7 @@ MQTTManager mqttManager(MQTT_BROKER_IP, MQTT_PORT);
 // --- Logical Services ---
 AuthProxy authProxy(&mqttManager);
 LogManager logManager(&mqttManager);
-StateMachine stateMachine(doorLock, 30000, &mqttManager);
+StateMachine stateMachine(doorLock, SESSION_DURATION_MS, &mqttManager);
 LocalAuthService localAuth;
 TimeService timeService;
 CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver, &authProxy);
@@ -75,17 +71,15 @@ HeartbeatService heartbeat(&mqttManager);
 
 // Automation Components
 PresenceService presenceService(&presenceSensor);
-LightService lightService(&lightSensor);
-AutomationController automationController(&presenceService, &lightService);
-LightingLogic lightingLogic(lightingDriver, presenceService, lightSensor);
-ProjectorLogic projectorLogic(projectorDriver, stateMachine, presenceService);
+LightingLogic lightingLogic(lightingDriver, presenceService, stateMachine);
+ProjectorLogic projectorLogic(projectorDriver, stateMachine);
 
 // Dashboard & UI
 DashboardService dashboardService(&mqttManager, &stateMachine, &presenceService, &lightingDriver, &projectorDriver);
 
 // --- High-Level Managers ---
-AccessService accessService(&rfidOutside, &rfidInside, &authProxy, &localAuth, &stateMachine);
-EnvironmentService environmentService(&presenceSensor, &lightSensor, &presenceService, &lightService, &automationController, &lightingLogic, &projectorLogic);
+AccessService accessService(&rfidOutside, &rfidInside, &authProxy, &localAuth, &stateMachine, &projectorLogic);
+EnvironmentService environmentService(&presenceSensor, &presenceService, &lightingLogic, &projectorLogic);
 AppManager appManager(&wifiManager, &mqttManager, &accessService, &environmentService, &heartbeat, &dashboardService, &attendanceManager);
 
 void setup() {

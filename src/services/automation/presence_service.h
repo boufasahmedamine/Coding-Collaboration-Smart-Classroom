@@ -19,6 +19,8 @@ private:
 
     bool _occupied;
     bool _previousState;
+    unsigned long _lastActivityTime;
+    static const unsigned long PERSISTENCE_WINDOW_MS = 60000; // 60 seconds
 };
 
 #endif

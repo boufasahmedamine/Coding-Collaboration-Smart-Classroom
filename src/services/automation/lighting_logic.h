@@ -3,20 +3,22 @@
 
 #include "drivers/actuators/lighting.h"
 #include "services/automation/presence_service.h"
-#include "drivers/ldr/ldr_driver.h"
+#include "system/state_machine.h"
 #include "config/automation_config.h"
 
 class LightingLogic
 {
 public:
-    LightingLogic(Lighting& lights, PresenceService& presence, LDRDriver& ldr);
+    LightingLogic(Lighting& lights, PresenceService& presence, StateMachine& stateMachine);
     void update();
 
 private:
     Lighting& _lights;
     PresenceService& _presence;
-    LDRDriver& _ldr;
+    StateMachine& _stateMachine;
+    
     bool _lastState;
+    bool _sessionStickyOn;
 };
 
 #endif

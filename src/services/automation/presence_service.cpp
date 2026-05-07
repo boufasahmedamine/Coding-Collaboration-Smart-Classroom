@@ -3,7 +3,8 @@
 PresenceService::PresenceService(MainsPIRInput* driver)
     : _driver(driver),
       _occupied(false),
-      _previousState(false)
+      _previousState(false),
+      _lastActivityTime(0)
 {
 }
 
@@ -12,7 +13,18 @@ void PresenceService::update()
     _previousState = _occupied;
 
     if (_driver) {
-        _occupied = _driver->isMotionDetected();
+        bool rawMotion = _driver->isMotionDetected();
+        unsigned long now = millis();
+
+        if (rawMotion) {
+            _lastActivityTime = now;
+            _occupied = true;
+        } else {
+            // Only mark as empty if the persistence window has expired
+            if (now - _lastActivityTime >= PERSISTENCE_WINDOW_MS) {
+                _occupied = false;
+            }
+        }
     }
 }
 

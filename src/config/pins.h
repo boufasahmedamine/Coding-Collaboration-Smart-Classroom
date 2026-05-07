@@ -9,8 +9,7 @@
 #define PIN_MAINS_PIR_INPUT 4  // Opto-isolated 220V PIR (Active LOW)
 
 // --- ANALOG SENSORS ---
-// Photoresistor
-#define PIN_LDR        34
+// (Purged - handled by hardware PIR)
 
 // --- RELAYS & ACTUATORS ---
 #define PIN_DOOR_LOCK  25

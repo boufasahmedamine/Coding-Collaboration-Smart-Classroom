@@ -32,6 +32,7 @@ namespace Diagnostics {
     void setBrokerInfo(const String& info) { _brokerInfo = info; }
     void setDashboardVisible(bool visible) { _visible = visible; }
     bool isDashboardVisible() { return _visible; }
+    static int _ldrValue = 0; // Keeping symbol temporarily to avoid breakage in un-updated files, will remove in final step
     void setLDRValue(int value) { _ldrValue = value; }
     void setLightingStatus(const String& status) { _lightStatus = status; }
     void logEvent(const String& eventStr) { _lastEvent = eventStr; }
@@ -51,7 +52,7 @@ namespace Diagnostics {
             Serial.printf("[RFID] OUT (Entry):   %s\n", _rfidStatusOut.c_str());
             Serial.printf("[RFID] IN (Attend):   %s\n", _rfidStatusIn.c_str());
             Serial.printf("[DOOR] Maglock:       %s\n", _doorStatus.c_str());
-            Serial.printf("[LITE] LDR Value:     %d\n", _ldrValue);
+            // Serial.printf("[LITE] LDR Value:     %d\n", _ldrValue); // Purged
             Serial.printf("[LITE] Relays:        %s\n", _lightStatus.c_str());
             
             Serial.println("---------------- Networking ----------------------");
@@ -66,8 +67,8 @@ namespace Diagnostics {
             
             // --- Hardware Logic Probe Section ---
             Serial.println("----------- Hardware Pin Monitor -----------------");
-            Serial.printf("PIR (4): %-4s | LDR (34): %-4d | DOOR (25): %s\n", 
-                (digitalRead(4) == HIGH ? "HIGH" : "LOW"), analogRead(34), (digitalRead(25) == HIGH ? "HIGH" : "LOW"));
+            Serial.printf("PIR (4): %-4s | DOOR (25): %s\n", 
+                (digitalRead(4) == HIGH ? "HIGH" : "LOW"), (digitalRead(25) == HIGH ? "HIGH" : "LOW"));
             Serial.printf("RDM_O(16): %-4s | RDM_I(17): %-4s\n",
                 (digitalRead(16) == HIGH ? "HIGH" : "LOW"), (digitalRead(17) == HIGH ? "HIGH" : "LOW"));
             Serial.println("==================================================");
