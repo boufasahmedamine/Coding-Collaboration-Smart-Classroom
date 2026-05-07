@@ -14,7 +14,6 @@ namespace Diagnostics {
     static String _localIP = "0.0.0.0";
     static String _mqttStatus = "OFFLINE";
     static String _brokerInfo = "N/A";
-    static int _ldrValue = 0;
     static String _lightStatus = "UNKNOWN";
     static String _lastEvent = "Node Booting...";
     static bool _visible = true;
@@ -32,8 +31,6 @@ namespace Diagnostics {
     void setBrokerInfo(const String& info) { _brokerInfo = info; }
     void setDashboardVisible(bool visible) { _visible = visible; }
     bool isDashboardVisible() { return _visible; }
-    static int _ldrValue = 0; // Keeping symbol temporarily to avoid breakage in un-updated files, will remove in final step
-    void setLDRValue(int value) { _ldrValue = value; }
     void setLightingStatus(const String& status) { _lightStatus = status; }
     void logEvent(const String& eventStr) { _lastEvent = eventStr; }
 
