@@ -6,7 +6,7 @@
 #define PIN_RDM6300_IN_RX  17  // UART2 RX for Inside RFID
 
 // --- DIGITAL SENSORS ---
-#define PIN_MAINS_PIR_INPUT 4  // Opto-isolated 220V PIR (Active LOW)
+#define PIN_MAINS_PIR_INPUT 18 // Opto-isolated 220V PIR (GPIO 18 is more EMI-robust)
 
 // --- ANALOG SENSORS ---
 // (Purged - handled by hardware PIR)

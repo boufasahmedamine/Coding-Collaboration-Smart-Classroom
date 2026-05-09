@@ -23,8 +23,8 @@ private:
     unsigned long _stateChangeTime;
     
     // Asymmetric timing constants
-    static const unsigned long DEBOUNCE_TIME_LOW_MS = 200;  // Time needed for active state
-    static const unsigned long DEBOUNCE_TIME_HIGH_MS = 500; // Time needed for inactive state
+    static const unsigned long DEBOUNCE_TIME_LOW_MS = 500;  // Half second for stability
+    static const unsigned long DEBOUNCE_TIME_HIGH_MS = 3000; // 3 seconds to clear chatter
 };
 
 #endif

@@ -20,10 +20,17 @@ void EnvironmentService::update() {
     _lightingLogic->update();
     _projectorLogic->update();
 
-    if (_presence->justBecameOccupied()) {
-        Diagnostics::logEvent("PRESENCE: Room became occupied");
+    static unsigned long _lastPresenceLog = 0;
+    unsigned long now = millis();
+
+    if (_presence->justBecameOccupied() && (now - _lastPresenceLog > 5000)) {
+        _lastPresenceLog = now;
+        Diagnostics::setPresenceStatus("OCCUPIED");
+        Diagnostics::logEvent(">>> PRESENCE DETECTED <<<");
     }
-    if (_presence->justBecameEmpty()) {
+    if (_presence->justBecameEmpty() && (now - _lastPresenceLog > 5000)) {
+        _lastPresenceLog = now;
+        Diagnostics::setPresenceStatus("EMPTY");
         Diagnostics::logEvent("PRESENCE: Room became empty");
     }
 }

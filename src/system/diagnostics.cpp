@@ -15,6 +15,7 @@ namespace Diagnostics {
     static String _mqttStatus = "OFFLINE";
     static String _brokerInfo = "N/A";
     static String _lightStatus = "UNKNOWN";
+    static String _presenceStatus = "EMPTY";
     static String _lastEvent = "Node Booting...";
     static bool _visible = true;
 
@@ -31,6 +32,7 @@ namespace Diagnostics {
     void setBrokerInfo(const String& info) { _brokerInfo = info; }
     void setDashboardVisible(bool visible) { _visible = visible; }
     bool isDashboardVisible() { return _visible; }
+    void setPresenceStatus(const String& status) { _presenceStatus = status; }
     void setLightingStatus(const String& status) { _lightStatus = status; }
     void logEvent(const String& eventStr) { _lastEvent = eventStr; }
 
@@ -49,6 +51,7 @@ namespace Diagnostics {
             Serial.printf("[RFID] OUT (Entry):   %s\n", _rfidStatusOut.c_str());
             Serial.printf("[RFID] IN (Attend):   %s\n", _rfidStatusIn.c_str());
             Serial.printf("[DOOR] Maglock:       %s\n", _doorStatus.c_str());
+            Serial.printf("[ENVI] Presence:      %s\n", _presenceStatus.c_str());
             // Serial.printf("[LITE] LDR Value:     %d\n", _ldrValue); // Purged
             Serial.printf("[LITE] Relays:        %s\n", _lightStatus.c_str());
             
@@ -64,8 +67,8 @@ namespace Diagnostics {
             
             // --- Hardware Logic Probe Section ---
             Serial.println("----------- Hardware Pin Monitor -----------------");
-            Serial.printf("PIR (4): %-4s | DOOR (25): %s\n", 
-                (digitalRead(4) == HIGH ? "HIGH" : "LOW"), (digitalRead(25) == HIGH ? "HIGH" : "LOW"));
+            Serial.printf("PIR (18): %-4s | DOOR (25): %s\n", 
+                (digitalRead(18) == HIGH ? "HIGH" : "LOW"), (digitalRead(25) == HIGH ? "HIGH" : "LOW"));
             Serial.printf("RDM_O(16): %-4s | RDM_I(17): %-4s\n",
                 (digitalRead(16) == HIGH ? "HIGH" : "LOW"), (digitalRead(17) == HIGH ? "HIGH" : "LOW"));
             Serial.println("==================================================");
