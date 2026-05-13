@@ -80,7 +80,7 @@ DashboardService dashboardService(&mqttManager, &stateMachine, &presenceService,
 // --- High-Level Managers ---
 AccessService accessService(&rfidOutside, &rfidInside, &authProxy, &localAuth, &stateMachine, &projectorLogic);
 EnvironmentService environmentService(&presenceSensor, &presenceService, &lightingLogic, &projectorLogic);
-AppManager appManager(&wifiManager, &mqttManager, &accessService, &environmentService, &heartbeat, &dashboardService, &attendanceManager);
+AppManager appManager(&wifiManager, &mqttManager, &accessService, &environmentService, &heartbeat, &dashboardService, &attendanceManager, &stateMachine, &lightingLogic);
 
 void setup() {
     Serial.begin(115200);

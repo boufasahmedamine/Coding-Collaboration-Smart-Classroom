@@ -11,13 +11,16 @@
 #include "services/system/heartbeat_service.h"
 #include "services/network/dashboard_service.h"
 #include "services/attendance/attendance_manager.h"
+#include "drivers/sensors/button_driver.h"
+#include "system/state_machine.h"
+#include "services/automation/lighting_logic.h"
 
 class AppManager {
 public:
     AppManager(WiFiManager* wifi, MQTTManager* mqtt, 
                AccessService* access, EnvironmentService* env,
                HeartbeatService* hb, DashboardService* ds, 
-               AttendanceManager* am);
+               AttendanceManager* am, StateMachine* sm, LightingLogic* ll);
 
     void start();
 
@@ -29,11 +32,17 @@ private:
     HeartbeatService* _hb;
     DashboardService* _ds;
     AttendanceManager* _am;
+    StateMachine* _stateMachine;
+    LightingLogic* _lightingLogic;
+
+    ButtonDriver _exitBtn;
+    ButtonDriver _lightBtn;
 
     static void vTaskNetwork(void* pvParameters);
     static void vTaskRFID(void* pvParameters);
     static void vTaskCoreLogic(void* pvParameters);
     static void vTaskStatus(void* pvParameters);
+    static void vTaskButtons(void* pvParameters);
     static void vTaskDiagnostics(void* pvParameters);
 };
 

@@ -2,7 +2,7 @@
 
 LightingLogic::LightingLogic(Lighting& lights, PresenceService& presence, StateMachine& stateMachine)
     : _lights(lights), _presence(presence), _stateMachine(stateMachine), 
-      _lastState(false), _sessionStickyOn(false)
+      _lastState(false), _sessionStickyOn(false), _manualOverride(false)
 {
 }
 
@@ -15,13 +15,16 @@ void LightingLogic::update()
     // Once presence is detected during a session, lights stay ON for the duration.
     if (!sessionActive) {
         _sessionStickyOn = false;
+        _manualOverride = false; // Reset override when session ends for next class
     } else {
         if (presence) {
             _sessionStickyOn = true;
         }
     }
 
-    bool shouldBeOn = _sessionStickyOn;
+    // Force Light Override Logic
+    // Manual override OR sticky session presence
+    bool shouldBeOn = _manualOverride || _sessionStickyOn;
     
     if (shouldBeOn != _lastState)
     {
@@ -35,4 +38,8 @@ void LightingLogic::update()
         }
         _lastState = shouldBeOn;
     }
+}
+
+void LightingLogic::toggleManualOverride() {
+    _manualOverride = !_manualOverride;
 }

@@ -11,6 +11,7 @@ class LightingLogic
 public:
     LightingLogic(Lighting& lights, PresenceService& presence, StateMachine& stateMachine);
     void update();
+    void toggleManualOverride();
 
 private:
     Lighting& _lights;
@@ -19,6 +20,7 @@ private:
     
     bool _lastState;
     bool _sessionStickyOn;
+    bool _manualOverride;
 };
 
 #endif

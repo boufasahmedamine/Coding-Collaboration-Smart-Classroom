@@ -1,4 +1,5 @@
 #include "system/app_manager.h"
+#include "config/pins.h"
 #include "system/diagnostics.h"
 
 extern SemaphoreHandle_t xMutex_MQTT;
@@ -6,9 +7,10 @@ extern SemaphoreHandle_t xMutex_MQTT;
 AppManager::AppManager(WiFiManager* wifi, MQTTManager* mqtt, 
                        AccessService* access, EnvironmentService* env,
                        HeartbeatService* hb, DashboardService* ds, 
-                       AttendanceManager* am)
+                       AttendanceManager* am, StateMachine* sm, LightingLogic* ll)
     : _wifi(wifi), _mqtt(mqtt), _access(access), _env(env), 
-      _hb(hb), _ds(ds), _am(am)
+      _hb(hb), _ds(ds), _am(am), _stateMachine(sm), _lightingLogic(ll),
+      _exitBtn(PIN_EXIT_BUTTON), _lightBtn(PIN_LIGHT_BUTTON)
 {
 }
 
@@ -17,6 +19,7 @@ void AppManager::start() {
     xTaskCreatePinnedToCore(vTaskRFID, "RFIDTask", 4096, this, 3, NULL, 1);
     xTaskCreatePinnedToCore(vTaskStatus, "StatusTask", 6144, this, 1, NULL, 1);
     xTaskCreatePinnedToCore(vTaskCoreLogic, "CoreLogic", 8192, this, 2, NULL, 1);
+    xTaskCreatePinnedToCore(vTaskButtons, "Buttons", 2048, this, 2, NULL, 1);
 #if ENABLE_DIAGNOSTICS_DASHBOARD
     xTaskCreatePinnedToCore(vTaskDiagnostics, "Diagnostics", 4096, NULL, 1, NULL, 1);
 #endif
@@ -57,6 +60,31 @@ void AppManager::vTaskStatus(void* pvParameters) {
         app->_am->update();
         app->_ds->update();
         vTaskDelay(1000 / portTICK_PERIOD_MS); 
+    }
+}
+
+void AppManager::vTaskButtons(void* pvParameters) {
+    AppManager* app = (AppManager*)pvParameters;
+    app->_exitBtn.begin();
+    app->_lightBtn.begin();
+    
+    extern SemaphoreHandle_t xMutex_StateMachine;
+
+    for (;;) {
+        if (app->_exitBtn.isPressed()) {
+            Diagnostics::logEvent("[BTN] Force Exit Triggered");
+            if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+                app->_stateMachine->handleEvent(StateMachine::SystemEvent::UNLOCK_REQUEST);
+                xSemaphoreGive(xMutex_StateMachine);
+            }
+        }
+
+        if (app->_lightBtn.isPressed()) {
+            Diagnostics::logEvent("[BTN] Force Light Toggle Triggered");
+            app->_lightingLogic->toggleManualOverride();
+        }
+
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 

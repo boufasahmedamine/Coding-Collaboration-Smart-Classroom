@@ -18,4 +18,8 @@
 #define PIN_LIGHTING   26
 #define PIN_PROJECTOR  27
 
+// --- OVERRIDE BUTTONS ---
+#define PIN_EXIT_BUTTON    32
+#define PIN_LIGHT_BUTTON   33
+
 #endif
