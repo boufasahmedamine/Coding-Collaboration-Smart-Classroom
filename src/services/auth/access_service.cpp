@@ -43,17 +43,41 @@ void AccessService::update() {
 void AccessService::handleOutsideScan(uint8_t* uid, uint8_t len) {
     Diagnostics::logEvent("[RFID] Outside scan detected");
     
-    if (_localAuth->isAdmin(uid, len)) {
-        if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+    LocalAuthService::UserRole role = _localAuth->getRole(uid, len);
+
+    if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+        bool isLatchedSession = _stateMachine->isLatched();
+        bool isSessionActive = _stateMachine->isSessionActive();
+
+        // --- TOGGLE LOGIC: Scan-Out for Admin/Maintenance ---
+        if (isSessionActive && isLatchedSession) {
+            if (role == LocalAuthService::UserRole::ADMIN || role == LocalAuthService::UserRole::MAINTENANCE) {
+                Diagnostics::logEvent("[RFID] High-Level Card: Terminating Latched Session");
+                _stateMachine->terminateSession();
+                xSemaphoreGive(xMutex_StateMachine);
+                return;
+            }
+        }
+
+        // --- NEW SESSION LOGIC ---
+        if (role == LocalAuthService::UserRole::ADMIN || role == LocalAuthService::UserRole::MAINTENANCE) {
+            Diagnostics::logEvent("[RFID] High-Level Card: Starting Soft-Latched Session (8h)");
+            _stateMachine->setLatched(true);
+            _stateMachine->setSessionDuration(28800000UL); // 8 Hours Safety Net
+            
+            // Role-specific Authorization
+            if (_projectorLogic) {
+                _projectorLogic->setAuthorized(role == LocalAuthService::UserRole::ADMIN);
+            }
+
             _stateMachine->handleEvent(StateMachine::SystemEvent::ADMIN_BYPASS, uid, len);
-            xSemaphoreGive(xMutex_StateMachine);
-        }
-    } else {
-        _authProxy->requestAuthorization(uid, len);
-        if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {
+        } else {
+            // Normal Student Path
+            _authProxy->requestAuthorization(uid, len);
             _stateMachine->handleEvent(StateMachine::SystemEvent::RFID_READ, uid, len);
-            xSemaphoreGive(xMutex_StateMachine);
         }
+
+        xSemaphoreGive(xMutex_StateMachine);
     }
 }
 

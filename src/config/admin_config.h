@@ -15,4 +15,10 @@ const uint8_t ADMIN_UIDS[][7] = {
 
 const int ADMIN_COUNT = 2;
 
+const uint8_t MAINTENANCE_UIDS[][7] = {
+    {0xAA, 0xBB, 0xCC, 0xDD}, // Placeholder Maintenance 1
+    {0x11, 0x22, 0x33, 0x44}  // Placeholder Maintenance 2
+};
+const int MAINTENANCE_COUNT = 2;
+
 #endif

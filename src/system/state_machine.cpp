@@ -23,6 +23,7 @@ StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeou
       _authTimeoutMs(AUTH_TIMEOUT_MS),
       _presenceDetected(false),
       _overrideActive(false),
+      _isLatched(false),
       _mqtt(mqtt)
 {
     _session.active = false;
@@ -196,9 +197,12 @@ void StateMachine::update() {
         if (_overrideActive) return;
 
         if (currentTime - _sessionStartTime >= _sessionDurationMs) {
-            if (!_presenceDetected) {
+            // If latched, we only lock when the timer expires (presence is ignored)
+            // If NOT latched, we lock when timer expires AND no presence
+            if (_isLatched || !_presenceDetected) {
                 _session.endTime = currentTime;
                 _session.active = false;
+                _isLatched = false; // Reset latch
                 _doorLock.lock();
                 transitionTo(SystemState::LOCKED);
                 Diagnostics::logEvent("SESSION: Timeout reached. Locking door.");
@@ -248,4 +252,25 @@ void StateMachine::setOverrideActive(bool active) {
     if (_overrideActive && _currentState == SystemState::LOCKED) {
         transitionTo(SystemState::UNLOCKED);
     }
-}
+}
+
+void StateMachine::setLatched(bool latched) {
+    _isLatched = latched;
+}
+
+bool StateMachine::isLatched() const {
+    return _isLatched;
+}
+
+void StateMachine::setSessionDuration(unsigned long durationMs) {
+    _sessionDurationMs = durationMs;
+}
+
+void StateMachine::terminateSession() {
+    Diagnostics::logEvent("SESSION: Manual Termination requested.");
+    _session.endTime = millis();
+    _session.active = false;
+    _isLatched = false;
+    _doorLock.lock();
+    transitionTo(SystemState::LOCKED);
+}

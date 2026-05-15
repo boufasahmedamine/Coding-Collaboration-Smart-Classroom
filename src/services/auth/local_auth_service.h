@@ -5,12 +5,17 @@
 
 class LocalAuthService {
 public:
+    enum class UserRole {
+        STUDENT,
+        ADMIN,
+        MAINTENANCE
+    };
+
     LocalAuthService();
     
-    /**
-     * Checks if a scanned UID matches any in the local Admin whitelist.
-     */
     bool isAdmin(const uint8_t* uid, uint8_t uidLength);
+    bool isMaintenance(const uint8_t* uid, uint8_t uidLength);
+    UserRole getRole(const uint8_t* uid, uint8_t uidLength);
 };
 
 #endif

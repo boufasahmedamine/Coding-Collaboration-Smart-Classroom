@@ -44,8 +44,12 @@ enum class SystemState {
 
     bool isSessionActive() const;
     bool isOverrideActive() const;
+    bool isLatched() const;
     void setPresenceDetected(bool detected);
     void setOverrideActive(bool active);
+    void setLatched(bool latched);
+    void setSessionDuration(unsigned long durationMs);
+    void terminateSession();
 
 private:
     DoorLockDriver& _doorLock;
@@ -60,6 +64,7 @@ private:
 
     bool _presenceDetected;
     bool _overrideActive;
+    bool _isLatched;
 
     SessionRecord _session;
 
