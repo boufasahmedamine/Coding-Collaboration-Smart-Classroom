@@ -5,6 +5,7 @@
 #include "drivers/doorlock/doorlock_driver.h"
 #include "system/session_record.h"
 
+class StatusLEDs;
 class AttendanceManager;
 class MQTTManager;
 
@@ -30,7 +31,7 @@ enum class SystemState {
 
     static const unsigned long DEFAULT_SESSION_TIMEOUT_MS = 5400000; // 1.5 hours
 
-    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, MQTTManager* mqtt = nullptr);
+    StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, MQTTManager* mqtt = nullptr, StatusLEDs* leds = nullptr);
 
     void init();
     void update();
@@ -65,6 +66,8 @@ private:
     bool _presenceDetected;
     bool _overrideActive;
     bool _isLatched;
+
+    StatusLEDs* _leds;
 
     SessionRecord _session;
 

@@ -14,13 +14,14 @@
 #include "drivers/sensors/button_driver.h"
 #include "system/state_machine.h"
 #include "services/automation/lighting_logic.h"
+#include "drivers/indicators/status_leds.h"
 
 class AppManager {
 public:
     AppManager(WiFiManager* wifi, MQTTManager* mqtt, 
                AccessService* access, EnvironmentService* env,
                HeartbeatService* hb, DashboardService* ds, 
-               AttendanceManager* am, StateMachine* sm, LightingLogic* ll);
+               AttendanceManager* am, StateMachine* sm, LightingLogic* ll, StatusLEDs* leds = nullptr);
 
     void start();
 
@@ -37,6 +38,7 @@ private:
 
     ButtonDriver _exitBtn;
     ButtonDriver _lightBtn;
+    StatusLEDs* _leds;
 
     static void vTaskNetwork(void* pvParameters);
     static void vTaskRFID(void* pvParameters);

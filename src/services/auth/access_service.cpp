@@ -1,13 +1,15 @@
 #include "services/auth/access_service.h"
+#include "drivers/indicators/status_leds.h"
 #include "system/diagnostics.h"
 #include <Arduino.h>
 
 extern SemaphoreHandle_t xMutex_StateMachine;
 
 AccessService::AccessService(IRFIDReader* outside, IRFIDReader* inside, 
-                             AuthProxy* proxy, LocalAuthService* local, StateMachine* sm, ProjectorLogic* projector)
+                             AuthProxy* proxy, LocalAuthService* local, StateMachine* sm, 
+                             ProjectorLogic* projector, StatusLEDs* leds)
     : _rfidOutside(outside), _rfidInside(inside), 
-      _authProxy(proxy), _localAuth(local), _stateMachine(sm), _projectorLogic(projector),
+      _authProxy(proxy), _localAuth(local), _stateMachine(sm), _projectorLogic(projector), _leds(leds),
       _lastHeartbeat(0)
 {
 }
@@ -62,6 +64,7 @@ void AccessService::handleOutsideScan(uint8_t* uid, uint8_t len) {
         // --- NEW SESSION LOGIC ---
         if (role == LocalAuthService::UserRole::ADMIN || role == LocalAuthService::UserRole::MAINTENANCE) {
             Diagnostics::logEvent("[RFID] High-Level Card: Starting Soft-Latched Session (8h)");
+            if (_leds) _leds->pulseSuccess(); // 🟢 Trigger LED
             _stateMachine->setLatched(true);
             _stateMachine->setSessionDuration(28800000UL); // 8 Hours Safety Net
             
@@ -87,6 +90,7 @@ void AccessService::handleInsideScan(uint8_t* uid, uint8_t len) {
     // Special Action: Teacher/Admin scan on inside reader authorizes the projector
     if (_localAuth->isAdmin(uid, len)) {
         Diagnostics::logEvent("[RFID] Teacher/Admin Inside - Projector Authorized");
+        if (_leds) _leds->pulseSuccess(); // 🟢 Trigger LED
         if (_projectorLogic) {
             _projectorLogic->setAuthorized(true);
         }

@@ -4,6 +4,7 @@
 #include "communication/mqtt_manager.h"
 #include <ArduinoJson.h>
 #include <Arduino.h>
+#include "drivers/indicators/status_leds.h"
 
 static const char* stateToString(StateMachine::SystemState state) {
     switch (state) {
@@ -14,7 +15,7 @@ static const char* stateToString(StateMachine::SystemState state) {
     }
 }
 
-StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, MQTTManager* mqtt)
+StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeoutMs, MQTTManager* mqtt, StatusLEDs* leds)
     : _doorLock(doorLock),
       _currentState(SystemState::LOCKED),
       _sessionStartTime(0),
@@ -24,6 +25,7 @@ StateMachine::StateMachine(DoorLockDriver& doorLock, unsigned long sessionTimeou
       _presenceDetected(false),
       _overrideActive(false),
       _isLatched(false),
+      _leds(leds),
       _mqtt(mqtt)
 {
     _session.active = false;
@@ -53,6 +55,7 @@ void StateMachine::transitionTo(SystemState newState) {
     switch (_currentState) {
         case SystemState::UNLOCKED:
             _doorLock.unlock();
+            if (_leds) _leds->pulseSuccess(); // 🟢 Trigger LED for any unlock
             _sessionStartTime = millis();
             break;
 

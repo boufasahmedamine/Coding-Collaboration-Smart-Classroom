@@ -9,10 +9,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
+class StatusLEDs;
+
 class AccessService {
 public:
     AccessService(IRFIDReader* outside, IRFIDReader* inside, 
-                  AuthProxy* proxy, LocalAuthService* local, StateMachine* sm, ProjectorLogic* projector);
+                  AuthProxy* proxy, LocalAuthService* local, StateMachine* sm, 
+                  ProjectorLogic* projector, StatusLEDs* leds = nullptr);
 
     void init();
     void update(); // Called within the RFID task
@@ -24,6 +27,7 @@ private:
     LocalAuthService* _localAuth;
     StateMachine* _stateMachine;
     ProjectorLogic* _projectorLogic;
+    StatusLEDs* _leds;
 
     unsigned long _lastHeartbeat;
     const unsigned long _heartbeatInterval = 5000;

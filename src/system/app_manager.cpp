@@ -7,10 +7,10 @@ extern SemaphoreHandle_t xMutex_MQTT;
 AppManager::AppManager(WiFiManager* wifi, MQTTManager* mqtt, 
                        AccessService* access, EnvironmentService* env,
                        HeartbeatService* hb, DashboardService* ds, 
-                       AttendanceManager* am, StateMachine* sm, LightingLogic* ll)
+                       AttendanceManager* am, StateMachine* sm, LightingLogic* ll, StatusLEDs* leds)
     : _wifi(wifi), _mqtt(mqtt), _access(access), _env(env), 
       _hb(hb), _ds(ds), _am(am), _stateMachine(sm), _lightingLogic(ll),
-      _exitBtn(PIN_EXIT_BUTTON), _lightBtn(PIN_LIGHT_BUTTON)
+      _exitBtn(PIN_EXIT_BUTTON), _lightBtn(PIN_LIGHT_BUTTON), _leds(leds)
 {
 }
 
@@ -71,6 +71,8 @@ void AppManager::vTaskButtons(void* pvParameters) {
     extern SemaphoreHandle_t xMutex_StateMachine;
 
     for (;;) {
+        if (app->_leds) app->_leds->update();
+
         if (app->_exitBtn.isPressed()) {
             Diagnostics::logEvent("[BTN] Force Exit Triggered");
             if (xSemaphoreTake(xMutex_StateMachine, portMAX_DELAY) == pdTRUE) {

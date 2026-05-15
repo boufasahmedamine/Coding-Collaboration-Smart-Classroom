@@ -22,4 +22,8 @@
 #define PIN_EXIT_BUTTON    32
 #define PIN_LIGHT_BUTTON   33
 
+// --- VISUAL INDICATORS ---
+#define PIN_LED_RED      12
+#define PIN_LED_GREEN    14
+
 #endif

@@ -13,6 +13,7 @@
 #include "drivers/rfid/rdm6300.h"
 #include "drivers/actuators/lighting.h"
 #include "drivers/actuators/ir_projector.h"
+#include "drivers/indicators/status_leds.h"
 
 // Services
 #include "services/auth/access_service.h"
@@ -54,6 +55,7 @@ RDM6300Driver rfidInside(&rdmInsideSerial, PIN_RDM6300_IN_RX, "INSIDE");
 MainsPIRInput presenceSensor(PIN_MAINS_PIR_INPUT);
 Lighting lightingDriver(PIN_LIGHTING);
 IRProjector projectorDriver(PIN_PROJECTOR);
+StatusLEDs statusLeds(PIN_LED_RED, PIN_LED_GREEN);
 
 // --- Networking ---
 WiFiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
@@ -62,7 +64,7 @@ MQTTManager mqttManager(MQTT_BROKER_IP, MQTT_PORT);
 // --- Logical Services ---
 AuthProxy authProxy(&mqttManager);
 LogManager logManager(&mqttManager);
-StateMachine stateMachine(doorLock, SESSION_DURATION_MS, &mqttManager);
+StateMachine stateMachine(doorLock, SESSION_DURATION_MS, &mqttManager, &statusLeds);
 LocalAuthService localAuth;
 TimeService timeService;
 CommandHandler commandHandler(&stateMachine, &timeService, &lightingDriver, &projectorDriver, &authProxy);
@@ -78,9 +80,9 @@ ProjectorLogic projectorLogic(projectorDriver, stateMachine);
 DashboardService dashboardService(&mqttManager, &stateMachine, &presenceService, &lightingDriver, &projectorDriver);
 
 // --- High-Level Managers ---
-AccessService accessService(&rfidOutside, &rfidInside, &authProxy, &localAuth, &stateMachine, &projectorLogic);
+AccessService accessService(&rfidOutside, &rfidInside, &authProxy, &localAuth, &stateMachine, &projectorLogic, &statusLeds);
 EnvironmentService environmentService(&presenceSensor, &presenceService, &lightingLogic, &projectorLogic);
-AppManager appManager(&wifiManager, &mqttManager, &accessService, &environmentService, &heartbeat, &dashboardService, &attendanceManager, &stateMachine, &lightingLogic);
+AppManager appManager(&wifiManager, &mqttManager, &accessService, &environmentService, &heartbeat, &dashboardService, &attendanceManager, &stateMachine, &lightingLogic, &statusLeds);
 
 void setup() {
     Serial.begin(115200);
@@ -96,6 +98,7 @@ void setup() {
     Diagnostics::logEvent("Smart Classroom Node Starting...");
 
     doorLock.begin();
+    statusLeds.begin();
     lightingDriver.begin();
     projectorDriver.begin();
     
