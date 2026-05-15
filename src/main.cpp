@@ -147,6 +147,9 @@ void loop() {
             case 'v':
                 Diagnostics::setDashboardVisible(!Diagnostics::isDashboardVisible());
                 break;
+            case 'm':
+                Diagnostics::toggleMode();
+                break;
             case 's':
                 Diagnostics::logEvent("[MAINT] Forcing State Sync");
                 dashboardService.update(true);

@@ -60,6 +60,7 @@ void MQTTManager::publish(const char* topic, const char* message)
 {
     if (_client.connected())
     {
+        Diagnostics::logMqttMessage(topic, message, false);
         _client.publish(topic, message);
     }
 }
@@ -75,6 +76,8 @@ void MQTTManager::callback(char* topic, byte* payload, unsigned int length)
     unsigned int len = (length < 255) ? length : 255;
     memcpy(message, payload, len);
     message[len] = '\0';
+
+    Diagnostics::logMqttMessage(topic, message, true);
 
     if (_commandHandler)
     {

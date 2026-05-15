@@ -1,6 +1,7 @@
 #include "services/network/command_handler.h"
 #include "services/auth/auth_proxy.h"
 #include "config/mqtt_config.h"
+#include "system/diagnostics.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -18,6 +19,7 @@ void CommandHandler::handleCommand(const char* payload, const char* topic)
         // --- Structured JSON Command (Commands Topic) ---
         if (strstr(topic, "/commands")) {
             if (doc["command"].isNull() || doc["value"].isNull()) {
+                Diagnostics::logMqttMessage(topic, "[REJECTED: Missing Keys]", true, true);
                 Serial.println("[CMD] Rejected: Missing command or value key");
                 return;
             }
@@ -26,6 +28,7 @@ void CommandHandler::handleCommand(const char* payload, const char* topic)
             
             // 🟠 Semantic Validation: Check if value is actually a boolean
             if (!doc["value"].is<bool>()) {
+                Diagnostics::logMqttMessage(topic, "[REJECTED: Non-Bool Value]", true, true);
                 Serial.printf("[CMD] Rejected: Command '%s' requires a boolean value\n", cmd);
                 return;
             }
@@ -59,6 +62,7 @@ void CommandHandler::handleCommand(const char* payload, const char* topic)
             uint32_t epoch = strtoul(payload + 10, NULL, 10);
             if (_timeService) _timeService->syncTime(epoch);
         } else {
+            Diagnostics::logMqttMessage(topic, "[MALFORMED JSON]", true, true);
             Serial.printf("[CMD] Rejected: Malformed JSON or invalid legacy string '%s'\n", payload);
         }
     }
